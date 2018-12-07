@@ -2,14 +2,14 @@
 from setuptools import setup
 
 setup(
-    name='repe',
+    name='fret',
     version='0.1',
-    url='https://github.com/yxonic/repe',
+    url='https://github.com/yxonic/fret',
     license='MIT',
     author='yxonic',
     author_email='yxonic@gmail.com',
     description='REProducible Experimental environment.',
-    packages=['repe'],
+    packages=['fret'],
     platforms='any',
     python_requires='>=3.5',
     install_requires=[
@@ -27,7 +27,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'repe = repe.cli:main',
+            'fret = fret.cli:main',
         ],
     }
 )

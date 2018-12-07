@@ -22,7 +22,7 @@ class ParseError(Exception):
 @lru_cache(maxsize=1)
 def get_app():
     sys.path.append('.')
-    config = toml.load(open('.repe.toml'))
+    config = toml.load(open('.fret.toml'))
     models = importlib.import_module(config['appname'] + '.models')
     command = importlib.import_module(config['appname'] + '.command')
     return {'models': models, 'command': command}

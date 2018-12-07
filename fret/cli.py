@@ -17,7 +17,7 @@ class _ArgumentParser(argparse.ArgumentParser):
 
 
 main_parser = _ArgumentParser(
-    formatter_class=argparse.ArgumentDefaultsHelpFormatter, prog='repe')
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter, prog='fret')
 
 subparsers = {}
 
