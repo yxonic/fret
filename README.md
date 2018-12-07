@@ -1,2 +1,2 @@
-# repe
-REProducible Experimental environment
+# fret
+Framework for Reproducible ExperimenTs
