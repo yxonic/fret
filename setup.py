@@ -13,7 +13,7 @@ setup(
     platforms='any',
     python_requires='>=3.5',
     install_requires=[
-        'toml'
+        'toml',
     ],
     extras_require={
         'dev': [
