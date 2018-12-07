@@ -57,7 +57,7 @@ def main():
                                          util.sub_class_checker(
                                              common.Command))}
 
-    from .app import command as c
+    c = common.get_app()['command']
     _commands.update(
         {m[0].lower(): m[1]
          for m in ins.getmembers(c,

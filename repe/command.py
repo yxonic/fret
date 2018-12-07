@@ -9,25 +9,6 @@ from . import common
 from . import util
 
 
-class Clean(common.Command):
-    """Command ``clean``.
-
-    Remove all snapshots in specific workspace. If ``--all`` is specified,
-    clean the entire workspace
-    """
-
-    def __init__(self, parser):
-        super().__init__(parser)
-        parser.add_argument('--all', action='store_true',
-                            help='clean the entire workspace')
-
-    def run(self, ws, args):
-        if args.all:
-            shutil.rmtree(str(ws))
-        else:
-            shutil.rmtree(str(ws.snapshot_path))
-
-
 class Config(common.Command):
     """Command ``config``,
 
@@ -46,7 +27,7 @@ class Config(common.Command):
         subs.required = True
         group_options = defaultdict(set)
         try:
-            from .app import models as mm
+            mm = common.get_app()['models']
             _models = {
                 m[0]: m[1]
                 for m in ins.getmembers(mm, util.sub_class_checker(mm.Model))
@@ -80,3 +61,22 @@ class Config(common.Command):
 
     def run(self, ws, args):
         pass
+
+
+class Clean(common.Command):
+    """Command ``clean``.
+
+    Remove all snapshots in specific workspace. If ``--all`` is specified,
+    clean the entire workspace
+    """
+
+    def __init__(self, parser):
+        super().__init__(parser)
+        parser.add_argument('--all', action='store_true',
+                            help='clean the entire workspace')
+
+    def run(self, ws, args):
+        if args.all:
+            shutil.rmtree(str(ws))
+        else:
+            shutil.rmtree(str(ws.snapshot_path))

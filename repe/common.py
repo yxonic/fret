@@ -1,11 +1,14 @@
 import abc
 import argparse
+import importlib
 import logging
 import pathlib
-from collections import namedtuple
-from operator import itemgetter
-
+import sys
 import toml
+
+from collections import namedtuple
+from functools import lru_cache
+from operator import itemgetter
 
 
 class NotConfiguredError(Exception):
@@ -14,6 +17,15 @@ class NotConfiguredError(Exception):
 
 class ParseError(Exception):
     pass
+
+
+@lru_cache(maxsize=1)
+def get_app():
+    sys.path.append('.')
+    config = toml.load(open('.repe.toml'))
+    models = importlib.import_module(config['appname'] + '.models')
+    command = importlib.import_module(config['appname'] + '.command')
+    return {'models': models, 'command': command}
 
 
 class Model(abc.ABC):
@@ -117,8 +129,7 @@ class Workspace:
 
     @staticmethod
     def _get_class(name):
-        from .app import models
-        return getattr(models, name)
+        return getattr(get_app()['models'], name)
 
     @property
     def path(self):
