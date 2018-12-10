@@ -22,74 +22,55 @@ class ParseError(Exception):
 @lru_cache(maxsize=1)
 def get_app():
     sys.path.append('.')
-    config = toml.load(open('.fret.toml'))
-    models = importlib.import_module(config['appname'] + '.models')
+    config = toml.load(open('fret.toml'))
+    models = importlib.import_module(config['appname'] + '.module')
     command = importlib.import_module(config['appname'] + '.command')
-    return {'models': models, 'command': command}
+    return {'module': models, 'command': command}
 
 
-class Model(abc.ABC):
-    """Interface for model that can save/load parameters.
+class Module(abc.ABC):
+    """Interface for configurable modules.
 
-    Each model class should have an ``_add_argument`` class method to define
+    Each module class should have an ``configure`` class method to define
     model arguments along with their types, default values, etc.
     """
 
     @classmethod
     @abc.abstractmethod
-    def add_arguments(cls, parser: argparse.ArgumentParser):
+    def configure(cls, parser: argparse.ArgumentParser):
         """Add arguments to an argparse subparser."""
         raise NotImplementedError
 
     @classmethod
     def build(cls, **kwargs):
-        """Build model. Parameters are specified by keyword arguments."""
+        """Build module. Parameters are specified by keyword arguments."""
         keys, values = zip(*sorted(list(kwargs.items()), key=itemgetter(0)))
         config = namedtuple(cls.__name__, keys)(*values)
         return cls(config)
 
     @classmethod
     def parse(cls, args):
-        """Parse command-line options and build model."""
+        """Parse command-line options and build module."""
 
         class _ArgumentParser(argparse.ArgumentParser):
             def error(self, message):
                 raise ParseError(message)
 
         parser = _ArgumentParser(prog='', add_help=False)
-        cls.add_arguments(parser)
+        cls.configure(parser)
         args = parser.parse_args(args)
-        # noinspection PyProtectedMember
         config = dict(args._get_kwargs())
-        Model._unfold_config(config)
         return cls.build(**config)
 
     def __init__(self, config):
         """
         Args:
-            config (namedtuple): model configuration
+            config (namedtuple): module configuration
         """
         self.config = config
 
     def __str__(self):
         return str(self.config)
-
-    @staticmethod
-    def _unfold_config(cfg):
-        for k, v in list(cfg.items()):
-            if isinstance(v, dict):
-                Model._unfold_config(v)
-            if '.' not in k:
-                continue
-            d = cfg
-            for sec in k.split('.')[:-1]:
-                if sec in d:
-                    d = d[sec]
-                else:
-                    d[sec] = {}
-                    d = d[sec]
-            d[k.split('.')[-1]] = v
-            del cfg[k]
 
 
 class Workspace:
@@ -97,39 +78,36 @@ class Workspace:
     with specific configuration, save snapshots, open results, etc., using
     workspace objects."""
 
-    def __init__(self, path: str, model=None, config=None):
+    def __init__(self, path: str):
         self._path = pathlib.Path(path)
         self._log_path = self._path / 'log'
         self._snapshot_path = self._path / 'snapshot'
         self._result_path = self._path / 'result'
+        self._modules = None
 
-        if model is None:
-            self._model_cls = None
-            self._config = None
-            return
+    def load(self):
+        """Load configuration."""
+        self._modules = {}
+        try:
+            config = toml.load((self.path / 'config.toml').open())
+            for name, cfg in config.items():
+                cls = self.__class__._get_module_cls(cfg['module'])
+                del cfg['module']
+                self.add_module(name, cls, cfg)
+        except FileNotFoundError:
+            pass
 
-        if config is None:
-            config = {}
-
-        self._set_model(model, config)
-        self._save()
-
-    def __str__(self):
-        return str(self.path)
-
-    def __repr__(self):
-        return 'Workspace(path=' + str(self.path) + ')'
-
-    def _set_model(self, model, config):
-        if isinstance(model, str):
-            self._model_cls = Workspace._get_model_cls(model)
-        else:
-            self._model_cls = model
-        self._config = config
+    def save(self):
+        """Save configuration."""
+        f = (self.path / 'config.toml').open('w')
+        cfg = {name: dict({'module': cls.__name__}, **cfg)
+               for name, (cls, cfg) in self._modules.items()}
+        toml.dump(cfg, f)
+        f.close()
 
     @staticmethod
-    def _get_model_cls(name):
-        return getattr(get_app()['models'], name)
+    def _get_module_cls(name):
+        return getattr(get_app()['module'], name)
 
     @property
     def path(self):
@@ -155,37 +133,22 @@ class Workspace:
             self._log_path.mkdir(parents=True)
         return self._log_path
 
-    @property
-    def model_name(self):
-        return self.model_cls.__name__
+    def add_module(self, name, module, config):
+        self._modules[name] = (module, config)
 
-    @property
-    def model_cls(self):
-        if self._model_cls is not None:
-            return self._model_cls
-        self._load()
-        return self._model_cls
+    def get_module(self, name='main'):
+        if self._modules is None:
+            self.load()
+        if name in self._modules:
+            return self._modules[name]
+        else:
+            raise NotConfiguredError('module %s not configured' % name)
 
-    @property
-    def config(self):
-        if self._config is not None:
-            return self._config
-        self._load()
-        return self._config
-
-    def setup_like(self, model: Model):
-        """Configure workspace with configurations from a given model.
-
-        Args:
-            model (Model): model to be used
-        """
-        # noinspection PyProtectedMember
-        self._set_model(model.__class__, model.config._asdict())
-
-    def build_model(self):
-        """Build model according to the configurations in current
+    def build_module(self, name='main'):
+        """Build module according to the configurations in current
         workspace."""
-        return self.model_cls.build(**self.config)
+        cls, cfg = self.get_module(name)
+        return cls.build(**cfg)
 
     def logger(self, name: str):
         """Get a logger that logs to a file.
@@ -208,21 +171,11 @@ class Workspace:
         logger.addHandler(file_handler)
         return logger
 
-    def _load(self):
-        """Load configuration."""
-        try:
-            cfg = toml.load((self.path / 'config.toml').open())
-            self._set_model(cfg['model_name'], cfg[cfg['model_name'].lower()])
-        except (FileNotFoundError, KeyError):
-            raise NotConfiguredError('config.toml doesn\'t exist or '
-                                     'is incomplete')
+    def __str__(self):
+        return str(self.path)
 
-    def _save(self):
-        """Save configuration."""
-        f = (self.path / 'config.toml').open('w')
-        toml.dump({'model_name': self.model_name,
-                   self.model_name.lower(): self.config}, f)
-        f.close()
+    def __repr__(self):
+        return 'Workspace(path=' + str(self.path) + ')'
 
 
 class Command(abc.ABC):

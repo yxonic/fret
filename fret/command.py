@@ -23,39 +23,41 @@ class Config(common.Command):
 
     def __init__(self, parser):
         super().__init__(parser)
-        subs = parser.add_subparsers(title='models available', dest='model')
+        parser.add_argument('name', default='main', nargs='?',
+                            help='module name')
+        subs = parser.add_subparsers(title='modules available', dest='module')
         subs.required = True
         group_options = defaultdict(set)
         try:
-            mm = common.get_app()['models']
-            _models = {
+            mm = common.get_app()['module']
+            _modules = {
                 m[0]: m[1]
-                for m in ins.getmembers(mm, util.sub_class_checker(mm.Model))
+                for m in ins.getmembers(
+                    mm, util.sub_class_checker(common.Module))
                 if not m[0].startswith('_')}
         except ImportError:
-            _models = []
+            _modules = []
 
-        for model in _models:
+        for module in _modules:
             _parser_formatter = argparse.ArgumentDefaultsHelpFormatter
-            sub = subs.add_parser(model, formatter_class=_parser_formatter)
+            sub = subs.add_parser(module, formatter_class=_parser_formatter)
             group = sub.add_argument_group('config')
-            model_cls = _models[model]
-            model_cls.add_arguments(group)
-            # noinspection PyProtectedMember
+            model_cls = _modules[module]
+            model_cls.configure(group)
             for action in group._group_actions:
-                group_options[model].add(action.dest)
+                group_options[module].add(action.dest)
 
-            # noinspection PyProtectedMember
             def save(args):
-                _model = args.model
+                ws = common.Workspace(args.workspace)
+                _model = args.module
                 config = {name: value for (name, value) in args._get_kwargs()
                           if name in group_options[_model]}
-                model_cls._unfold_config(config)
-                print('In [%s]: configured %s with %s' %
-                      (args.workspace, _model, str(config)),
+                print('[%s] configured "%s" as "%s" with %s' %
+                      (args.workspace, args.name, _model, str(config)),
                       file=sys.stderr)
-
-                common.Workspace(args.workspace, _model, config)
+                ws.load()
+                ws.add_module(args.name, getattr(mm, _model), config)
+                ws.save()
 
             sub.set_defaults(func=save)
 
@@ -74,9 +76,16 @@ class Clean(common.Command):
         super().__init__(parser)
         parser.add_argument('--all', action='store_true',
                             help='clean the entire workspace')
+        parser.add_argument('-c', dest='config', action='store_true',
+                            help='clear workspace configuration')
 
     def run(self, ws, args):
         if args.all:
             shutil.rmtree(str(ws))
         else:
+            if args.config:
+                try:
+                    (ws.path / 'config.toml').unlink()
+                except FileNotFoundError:
+                    pass
             shutil.rmtree(str(ws.snapshot_path))
