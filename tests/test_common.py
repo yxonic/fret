@@ -13,7 +13,7 @@ common.Workspace._get_module_cls = _get_model_cls
 
 class ModuleTest(common.Module):
     @classmethod
-    def configure(cls, parser):
+    def add_arguments(cls, parser):
         parser.add_argument('-x', type=int, required=True)
         parser.add_argument('-y', type=int, default=10)
 

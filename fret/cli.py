@@ -66,9 +66,9 @@ def main():
 
     for _cmd, _cls in _commands.items():
         _sub = _subparsers.add_parser(
-            _cmd, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+            _cmd, help=_cls.help,
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         subparsers[_cmd] = _sub
-        # noinspection PyProtectedMember
         _sub.set_defaults(func=_cls(_sub)._run)
 
     _args = main_parser.parse_args()

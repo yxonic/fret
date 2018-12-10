@@ -2,6 +2,14 @@ import inspect as ins
 import re
 
 
+class classproperty(object):
+    def __init__(self, f):
+        self.f = f
+
+    def __get__(self, obj, owner):
+        return self.f(owner)
+
+
 def wrap_parser(namespace, parser):  # pragma: no cover
     """Wraps an argument parser, putting all following options under a
     namespace. """

@@ -10,6 +10,8 @@ from collections import namedtuple
 from functools import lru_cache
 from operator import itemgetter
 
+from . import util
+
 
 class NotConfiguredError(Exception):
     pass
@@ -35,9 +37,15 @@ class Module(abc.ABC):
     model arguments along with their types, default values, etc.
     """
 
+    submodules = []
+
+    @util.classproperty
+    def help(cls):
+        return 'module ' + cls.__name__
+
     @classmethod
     @abc.abstractmethod
-    def configure(cls, parser: argparse.ArgumentParser):
+    def add_arguments(cls, parser: argparse.ArgumentParser):
         """Add arguments to an argparse subparser."""
         raise NotImplementedError
 
@@ -57,7 +65,7 @@ class Module(abc.ABC):
                 raise ParseError(message)
 
         parser = _ArgumentParser(prog='', add_help=False)
-        cls.configure(parser)
+        cls.add_arguments(parser)
         args = parser.parse_args(args)
         config = dict(args._get_kwargs())
         return cls.build(**config)
@@ -71,6 +79,9 @@ class Module(abc.ABC):
 
     def __str__(self):
         return str(self.config)
+
+    def __repr__(self):
+        return str(self)
 
 
 class Workspace:
@@ -148,6 +159,9 @@ class Workspace:
         """Build module according to the configurations in current
         workspace."""
         cls, cfg = self.get_module(name)
+        for sub in cls.submodules:
+            if sub in cfg:
+                cfg[sub] = self.build_module(sub)
         return cls.build(**cfg)
 
     def logger(self, name: str):
@@ -180,6 +194,10 @@ class Workspace:
 
 class Command(abc.ABC):
     """Command interface."""
+
+    @util.classproperty
+    def help(cls):
+        return 'command ' + cls.__name__.lower()
 
     def __init__(self, parser):
         self.parser = parser

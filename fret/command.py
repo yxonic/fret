@@ -21,6 +21,8 @@ class Config(common.Command):
             In [ws/test]: configured Simple with Config(foo='5')
     """
 
+    help = 'configure module for workspace'
+
     def __init__(self, parser):
         super().__init__(parser)
         parser.add_argument('name', default='main', nargs='?',
@@ -40,10 +42,14 @@ class Config(common.Command):
 
         for module in _modules:
             _parser_formatter = argparse.ArgumentDefaultsHelpFormatter
-            sub = subs.add_parser(module, formatter_class=_parser_formatter)
+            module_cls = _modules[module]
+            sub = subs.add_parser(module, help=module_cls.help,
+                                  formatter_class=_parser_formatter)
             group = sub.add_argument_group('config')
-            model_cls = _modules[module]
-            model_cls.configure(group)
+            module_cls.add_arguments(group)
+            for submodule in module_cls.submodules:
+                group.add_argument('-' + submodule, default=submodule,
+                                   help='submodule ' + submodule)
             for action in group._group_actions:
                 group_options[module].add(action.dest)
 
@@ -71,6 +77,8 @@ class Clean(common.Command):
     Remove all snapshots in specific workspace. If ``--all`` is specified,
     clean the entire workspace
     """
+
+    help = 'clean workspace'
 
     def __init__(self, parser):
         super().__init__(parser)
