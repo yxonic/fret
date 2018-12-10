@@ -4,6 +4,13 @@ import pytest
 import fret.common as common
 
 
+def _get_model_cls(name):
+    return {'ModelTest': ModelTest}[name]
+
+
+common.Workspace._get_model_cls = _get_model_cls
+
+
 class ModelTest(common.Model):
     @classmethod
     def add_arguments(cls, parser):
@@ -31,6 +38,7 @@ def test_workspace(tmpdir: py.path.local):
     assert str(ws.log_path) == str(tmpdir.join('ws/log'))
     assert str(ws.result_path) == str(tmpdir.join('ws/result'))
     assert str(ws.snapshot_path) == str(tmpdir.join('ws/snapshot'))
+    assert ws.config == {'x': 3, 'y': 4}
 
     # test logging utilities
     logger = ws.logger('test')
@@ -40,3 +48,10 @@ def test_workspace(tmpdir: py.path.local):
     logger = ws.logger('test')
     logger.error('test log 2')
     assert len(list((ws.log_path / 'test.log').open())) == 2
+
+    ws = common.Workspace(str(tmpdir.join('ws')))
+    assert ws.config == {'x': 3, 'y': 4}
+
+    ws2 = common.Workspace(str(tmpdir.join('ws2')))
+    ws2.setup_like(ws.build_model())
+    assert str(ws2.build_model()) == 'ModelTest(x=3, y=4)'

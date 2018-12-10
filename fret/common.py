@@ -122,13 +122,13 @@ class Workspace:
 
     def _set_model(self, model, config):
         if isinstance(model, str):
-            self._model_cls = Workspace._get_class(model)
+            self._model_cls = Workspace._get_model_cls(model)
         else:
             self._model_cls = model
         self._config = config
 
     @staticmethod
-    def _get_class(name):
+    def _get_model_cls(name):
         return getattr(get_app()['models'], name)
 
     @property

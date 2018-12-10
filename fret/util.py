@@ -1,6 +1,5 @@
 import inspect as ins
 import re
-import sys
 
 
 def wrap_parser(namespace, parser):  # pragma: no cover
