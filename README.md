@@ -5,7 +5,11 @@
 Framework for Reproducible ExperimenTs
 
 ## TODO
+- [x] Better configuration logic
+- [ ] Global configuration file: `fret.toml`
+- [ ] Test coverage
+- [ ] `@fret.configurable` for modules
+- [ ] workspace utils (for snapshots, results, etc.)
 - [ ] Documents and examples
 - [ ] `fret new` command
-- [ ] Better configuration logic
-- [ ] Global configuration file: `fret.toml`
+- [ ] Other fret commands like log, show config, etc.
