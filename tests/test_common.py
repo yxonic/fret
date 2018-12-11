@@ -11,16 +11,17 @@ def _get_model_cls(name):
 common.Workspace._get_module_cls = _get_model_cls
 
 
-class ModuleTest(common.Module):
-    @classmethod
-    def add_arguments(cls, parser):
-        parser.add_argument('-x', type=int, required=True)
-        parser.add_argument('-y', type=int, default=10)
+@common.configurable
+class ModuleTest:
+    def __init__(self,
+                 x=(('required', True), ('type', int)),
+                 y=4):
+        pass
 
 
 def test_model():
     model1 = ModuleTest.parse(['-x', '10'])
-    model2 = ModuleTest.build(x=10, y=10)
+    model2 = ModuleTest(x=10, y=4)
     assert model1.config == model2.config
 
     with pytest.raises(common.ParseError) as e:

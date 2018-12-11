@@ -1,5 +1,4 @@
 import inspect as ins
-import re
 
 
 class classproperty(object):
@@ -8,22 +7,6 @@ class classproperty(object):
 
     def __get__(self, obj, owner):
         return self.f(owner)
-
-
-def wrap_parser(namespace, parser):  # pragma: no cover
-    """Wraps an argument parser, putting all following options under a
-    namespace. """
-    robj = re.compile(r'^(-+)')
-
-    class _Wrapper:
-        def __init__(self, _parser):
-            self.parser = _parser
-
-        def add_argument(self, *args, **kwargs):
-            args = [robj.sub(r'\1' + namespace + '.', s) for s in args]
-            self.parser.add_argument(*args, **kwargs)
-
-    return _Wrapper(parser)
 
 
 def colored(fmt, fg=None, bg=None, style=None):

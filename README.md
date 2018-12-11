@@ -8,7 +8,7 @@ Framework for Reproducible ExperimenTs
 - [x] Better configuration logic
 - [ ] Global configuration file: `fret.toml`
 - [ ] Test coverage
-- [ ] `@fret.configurable` for modules
+- [x] `@fret.configurable` for modules
 - [ ] workspace utils (for snapshots, results, etc.)
 - [ ] Documents and examples
 - [ ] `fret new` command

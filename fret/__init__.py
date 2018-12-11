@@ -1,3 +1,3 @@
-from .common import Workspace, Command, Module
+from .common import Workspace, Command, Module, configurable
 
-__all__ = ['Workspace', 'Command', 'Module']
+__all__ = ['Workspace', 'Command', 'Module', 'configurable']

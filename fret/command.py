@@ -28,7 +28,6 @@ class Config(common.Command):
         parser.add_argument('name', default='main', nargs='?',
                             help='module name')
         subs = parser.add_subparsers(title='modules available', dest='module')
-        subs.required = True
         group_options = defaultdict(set)
         try:
             mm = common.get_app()['module']
@@ -68,7 +67,14 @@ class Config(common.Command):
             sub.set_defaults(func=save)
 
     def run(self, ws, args):
-        pass
+        config = ws.config_path.open().read().strip()
+        if config:
+            print(config)
+        else:
+            print(util.colored('warning:', 'y', style='b'),
+                  'no configuration found. please run `fret config <module>`',
+                  file=sys.stderr)
+            self.parser.print_usage()
 
 
 class Clean(common.Command):

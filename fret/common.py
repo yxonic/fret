@@ -1,6 +1,7 @@
 import abc
 import argparse
 import importlib
+import inspect as ins
 import logging
 import pathlib
 import sys
@@ -50,13 +51,6 @@ class Module(abc.ABC):
         raise NotImplementedError
 
     @classmethod
-    def build(cls, **kwargs):
-        """Build module. Parameters are specified by keyword arguments."""
-        keys, values = zip(*sorted(list(kwargs.items()), key=itemgetter(0)))
-        config = namedtuple(cls.__name__, keys)(*values)
-        return cls(config)
-
-    @classmethod
     def parse(cls, args):
         """Parse command-line options and build module."""
 
@@ -68,13 +62,15 @@ class Module(abc.ABC):
         cls.add_arguments(parser)
         args = parser.parse_args(args)
         config = dict(args._get_kwargs())
-        return cls.build(**config)
+        return cls(**config)
 
-    def __init__(self, config):
+    def __init__(self, **kwargs):
         """
         Args:
             config (namedtuple): module configuration
         """
+        keys, values = zip(*sorted(list(kwargs.items()), key=itemgetter(0)))
+        config = namedtuple(self.__class__.__name__, keys)(*values)
         self.config = config
 
     def __str__(self):
@@ -82,6 +78,53 @@ class Module(abc.ABC):
 
     def __repr__(self):
         return str(self)
+
+
+def configurable(cls):
+    orig_init = cls.__init__
+    spec = ins.getfullargspec(orig_init)
+    n_config = len(spec.defaults)
+    submodules = spec.args[1:] if n_config == 0 else spec.args[1:-n_config]
+    config = dict() if n_config == 0 else \
+        {k: v for k, v in zip(spec.args[-n_config:], spec.defaults)}
+
+    def new_init(self, *args, **kwargs):
+        Module.__init__(**ins.getcallargs(
+            orig_init, self, *args, **kwargs))
+        cls.__init__(self, *args, **kwargs)
+
+    @classmethod
+    def add_arguments(cls, parser):
+        for k, v in config.items():
+            if isinstance(v, tuple):
+                v = {x: y for x, y in v}
+                value = v.get('default') or None
+                dtype = v.get('type') or None
+                if dtype is None and value is not None:
+                    dtype = type(value)
+                help = v.get('help') or ''
+                required = v.get('required') or False
+            else:
+                value = v
+                dtype = type(v)
+                help = ''
+                required = False
+
+            if dtype is None:
+                parser.add_argument('-' + k, help=help, required=required)
+            elif value is None:
+                parser.add_argument('-' + k, help=help,
+                                    type=dtype, required=required)
+            else:
+                parser.add_argument('-' + k, default=value, required=required,
+                                    type=dtype, help=help)
+
+    new_cls = type(cls.__name__, (cls, Module),
+                   dict(__init__=new_init,
+                        add_arguments=add_arguments,
+                        submodules=submodules))
+
+    return new_cls
 
 
 class Workspace:
@@ -94,23 +137,21 @@ class Workspace:
         self._log_path = self._path / 'log'
         self._snapshot_path = self._path / 'snapshot'
         self._result_path = self._path / 'result'
+        self._config_path = self._path / 'config.toml'
         self._modules = None
 
     def load(self):
         """Load configuration."""
         self._modules = {}
-        try:
-            config = toml.load((self.path / 'config.toml').open())
-            for name, cfg in config.items():
-                cls = self.__class__._get_module_cls(cfg['module'])
-                del cfg['module']
-                self.add_module(name, cls, cfg)
-        except FileNotFoundError:
-            pass
+        config = toml.load(self.config_path.open())
+        for name, cfg in config.items():
+            cls = self.__class__._get_module_cls(cfg['module'])
+            del cfg['module']
+            self.add_module(name, cls, cfg)
 
     def save(self):
         """Save configuration."""
-        f = (self.path / 'config.toml').open('w')
+        f = self.config_path.open('w')
         cfg = {name: dict({'module': cls.__name__}, **cfg)
                for name, (cls, cfg) in self._modules.items()}
         toml.dump(cfg, f)
@@ -144,6 +185,12 @@ class Workspace:
             self._log_path.mkdir(parents=True)
         return self._log_path
 
+    @property
+    def config_path(self):
+        if not self._config_path.exists():
+            self._config_path.open('w').close()
+        return self._config_path
+
     def add_module(self, name, module, config):
         self._modules[name] = (module, config)
 
@@ -162,7 +209,7 @@ class Workspace:
         for sub in cls.submodules:
             if sub in cfg:
                 cfg[sub] = self.build_module(sub)
-        return cls.build(**cfg)
+        return cls(**cfg)
 
     def logger(self, name: str):
         """Get a logger that logs to a file.
