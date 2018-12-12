@@ -6,9 +6,11 @@ Framework for Reproducible ExperimenTs
 
 ## TODO
 - [x] Better configuration logic
-- [ ] Global configuration file: `fret.toml`
-- [ ] Test coverage
 - [x] `@fret.configurable` for modules
+- [x] `@fret.command` for commands
+- [ ] Global configuration file: `fret.toml`
+- [ ] Workspace plugin system and plugins for torch and tf (try python mixin)
+- [ ] Test coverage
 - [ ] workspace utils (for snapshots, results, etc.)
 - [ ] Documents and examples
 - [ ] `fret new` command
