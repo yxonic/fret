@@ -10,3 +10,22 @@ def test_colored():
         '\x1b[1;31;44mhello\x1b[0m'
     assert fret.util.colored('hello', 'r', style='b') == \
         '\x1b[1;31mhello\x1b[0m'
+
+
+def test_classproperty():
+    class A:
+        @fret.util.classproperty
+        def name(cls):
+            return 'A'
+
+    class B(A):
+        @fret.util.classproperty
+        def name(cls):
+            return 'B'
+
+    class C(A):
+        pass
+
+    assert A.name == 'A'
+    assert B.name == 'B'
+    assert C.name == 'A'

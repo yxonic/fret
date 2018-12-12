@@ -1,3 +1,4 @@
-from .common import Workspace, Command, Module, configurable
+from .common import *
 
-__all__ = ['Workspace', 'Command', 'Module', 'configurable']
+__all__ = ['Workspace', 'Command', 'Module', 'configurable', 'command',
+           'NotConfiguredError', 'ParseError']

@@ -1,9 +1,9 @@
 import argparse
-import inspect as ins
+import collections
 import logging
+import shutil
 import sys
 
-from . import command
 from . import common
 from . import util
 
@@ -20,6 +20,93 @@ main_parser = _ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter, prog='fret')
 
 subparsers = {}
+
+
+class Config(common.Command):
+    """Command ``config``,
+
+    Configure a module and its parameters for a workspace.
+
+    Example:
+        .. code-block:: bash
+
+            $ python app.run -w ws/test config Simple -foo=5
+            In [ws/test]: configured Simple with Config(foo='5')
+    """
+
+    help = 'configure module for workspace'
+
+    def __init__(self, parser):
+        super().__init__(parser)
+        parser.add_argument('name', default='main', nargs='?',
+                            help='module name')
+        subs = parser.add_subparsers(title='modules available', dest='module')
+        group_options = collections.defaultdict(set)
+        try:
+            _modules = common.registered_modules
+        except ImportError:
+            _modules = {}
+
+        for module, module_cls in _modules.items():
+            _parser_formatter = argparse.ArgumentDefaultsHelpFormatter
+            sub = subs.add_parser(module, help=module_cls.help,
+                                  formatter_class=_parser_formatter)
+            group = sub.add_argument_group('config')
+            module_cls._add_arguments(group)
+            for action in group._group_actions:
+                group_options[module].add(action.dest)
+
+            def save(args):
+                ws = common.Workspace(args.workspace)
+                _module = args.module
+                config = {name: value for (name, value) in args._get_kwargs()
+                          if name in group_options[_module]}
+                print('[%s] configured "%s" as "%s" with %s' %
+                      (args.workspace, args.name, _module, str(config)),
+                      file=sys.stderr)
+                ws.load()
+                ws.add_module(args.name, module_cls, config)
+                ws.save()
+
+            sub.set_defaults(func=save)
+
+    def run(self, ws, args):
+        config = ws.config_path.open().read().strip()
+        if config:
+            print(config)
+        else:
+            print(util.colored('warning:', 'y', style='b'),
+                  'no configuration found. please run `fret config <module>`',
+                  file=sys.stderr)
+            self.parser.print_usage()
+
+
+class Clean(common.Command):
+    """Command ``clean``.
+
+    Remove all snapshots in specific workspace. If ``--all`` is specified,
+    clean the entire workspace
+    """
+
+    help = 'clean workspace'
+
+    def __init__(self, parser):
+        super().__init__(parser)
+        parser.add_argument('--all', action='store_true',
+                            help='clean the entire workspace')
+        parser.add_argument('-c', dest='config', action='store_true',
+                            help='clear workspace configuration')
+
+    def run(self, ws, args):
+        if args.all:
+            shutil.rmtree(str(ws))
+        else:
+            if args.config:
+                try:
+                    (ws.path / 'config.toml').unlink()
+                except FileNotFoundError:
+                    pass
+            shutil.rmtree(str(ws.snapshot_path))
 
 
 def real_main(args):
@@ -52,19 +139,11 @@ def main():
                                              dest='command')
     _subparsers.required = True
 
-    _commands = {m[0].lower(): m[1]
-                 for m in ins.getmembers(command,
-                                         util.sub_class_checker(
-                                             common.Command))}
+    common.register_app()
+    common.register_command('config', Config)
+    common.register_command('clean', Clean)
 
-    c = common.get_app()['command']
-    _commands.update(
-        {m[0].lower(): m[1]
-         for m in ins.getmembers(c,
-                                 util.sub_class_checker(common.Command))}
-    )
-
-    for _cmd, _cls in _commands.items():
+    for _cmd, _cls in common.registered_commands.items():
         _sub = _subparsers.add_parser(
             _cmd, help=_cls.help,
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)

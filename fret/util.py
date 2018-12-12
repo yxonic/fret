@@ -1,6 +1,3 @@
-import inspect as ins
-
-
 class classproperty(object):
     def __init__(self, f):
         self.f = f
@@ -79,14 +76,3 @@ def colored(fmt, fg=None, bg=None, style=None):
         return '\x1b[%sm%s\x1b[0m' % (props, fmt)
     else:
         return fmt
-
-
-def sub_class_checker(cls):
-    def rv(obj):
-        if ins.isclass(obj) and not ins.isabstract(obj) \
-                and issubclass(obj, cls):
-            return True
-        else:
-            return False
-
-    return rv

@@ -8,10 +8,12 @@ import sys
 import toml
 
 from collections import namedtuple
-from functools import lru_cache
 from operator import itemgetter
 
 from . import util
+
+registered_commands = {}
+registered_modules = {}
 
 
 class NotConfiguredError(Exception):
@@ -22,13 +24,25 @@ class ParseError(Exception):
     pass
 
 
-@lru_cache(maxsize=1)
-def get_app():
+def register_app():
     sys.path.append('.')
     config = toml.load(open('fret.toml'))
-    models = importlib.import_module(config['appname'] + '.module')
-    command = importlib.import_module(config['appname'] + '.command')
-    return {'module': models, 'command': command}
+    mc = importlib.import_module(config['appname'] + '.command')
+    mm = importlib.import_module(config['appname'] + '.module')
+
+    for m in ins.getmembers(mc, _sub_class_checker(Command)):
+        register_command(m[0].lower(), m[1])
+
+    for m in ins.getmembers(mm, _sub_class_checker(Module)):
+        register_module(m[0], m[1])
+
+
+def register_command(name, cls):
+    registered_commands[name] = cls
+
+
+def register_module(name, cls):
+    registered_modules[name] = cls
 
 
 class Module(abc.ABC):
@@ -45,6 +59,13 @@ class Module(abc.ABC):
         return 'module ' + cls.__name__
 
     @classmethod
+    def _add_arguments(cls, parser: argparse.ArgumentParser):
+        cls.add_arguments(parser)
+        for submodule in cls.submodules:
+            parser.add_argument('-' + submodule, default=submodule,
+                                help='submodule ' + submodule)
+
+    @classmethod
     @abc.abstractmethod
     def add_arguments(cls, parser: argparse.ArgumentParser):
         """Add arguments to an argparse subparser."""
@@ -59,7 +80,7 @@ class Module(abc.ABC):
                 raise ParseError(message)
 
         parser = _ArgumentParser(prog='', add_help=False)
-        cls.add_arguments(parser)
+        cls._add_arguments(parser)
         args = parser.parse_args(args)
         config = dict(args._get_kwargs())
         return cls(**config)
@@ -80,53 +101,6 @@ class Module(abc.ABC):
         return str(self)
 
 
-def configurable(cls):
-    orig_init = cls.__init__
-    spec = ins.getfullargspec(orig_init)
-    n_config = len(spec.defaults)
-    submodules = spec.args[1:] if n_config == 0 else spec.args[1:-n_config]
-    config = dict() if n_config == 0 else \
-        {k: v for k, v in zip(spec.args[-n_config:], spec.defaults)}
-
-    def new_init(self, *args, **kwargs):
-        Module.__init__(**ins.getcallargs(
-            orig_init, self, *args, **kwargs))
-        cls.__init__(self, *args, **kwargs)
-
-    @classmethod
-    def add_arguments(cls, parser):
-        for k, v in config.items():
-            if isinstance(v, tuple):
-                v = {x: y for x, y in v}
-                value = v.get('default') or None
-                dtype = v.get('type') or None
-                if dtype is None and value is not None:
-                    dtype = type(value)
-                help = v.get('help') or ''
-                required = v.get('required') or False
-            else:
-                value = v
-                dtype = type(v)
-                help = ''
-                required = False
-
-            if dtype is None:
-                parser.add_argument('-' + k, help=help, required=required)
-            elif value is None:
-                parser.add_argument('-' + k, help=help,
-                                    type=dtype, required=required)
-            else:
-                parser.add_argument('-' + k, default=value, required=required,
-                                    type=dtype, help=help)
-
-    new_cls = type(cls.__name__, (cls, Module),
-                   dict(__init__=new_init,
-                        add_arguments=add_arguments,
-                        submodules=submodules))
-
-    return new_cls
-
-
 class Workspace:
     """Workspace utilities. One can save/load configurations, build models
     with specific configuration, save snapshots, open results, etc., using
@@ -145,7 +119,7 @@ class Workspace:
         self._modules = {}
         config = toml.load(self.config_path.open())
         for name, cfg in config.items():
-            cls = self.__class__._get_module_cls(cfg['module'])
+            cls = registered_modules[cfg['module']]
             del cfg['module']
             self.add_module(name, cls, cfg)
 
@@ -156,10 +130,6 @@ class Workspace:
                for name, (cls, cfg) in self._modules.items()}
         toml.dump(cfg, f)
         f.close()
-
-    @staticmethod
-    def _get_module_cls(name):
-        return getattr(get_app()['module'], name)
 
     @property
     def path(self):
@@ -191,8 +161,13 @@ class Workspace:
             self._config_path.open('w').close()
         return self._config_path
 
-    def add_module(self, name, module, config):
-        self._modules[name] = (module, config)
+    def add_module(self, name, module, config=None):
+        if self._modules is None:
+            self.load()
+        if config is None:
+            self._modules[name] = (module.__class__, module.config._asdict())
+        else:
+            self._modules[name] = (module, config)
 
     def get_module(self, name='main'):
         if self._modules is None:
@@ -206,8 +181,9 @@ class Workspace:
         """Build module according to the configurations in current
         workspace."""
         cls, cfg = self.get_module(name)
+
         for sub in cls.submodules:
-            if sub in cfg:
+            if sub in cfg and isinstance(cfg[sub], str):
                 cfg[sub] = self.build_module(sub)
         return cls(**cfg)
 
@@ -253,7 +229,6 @@ class Command(abc.ABC):
         ws = Workspace(args.workspace)
         cmd = args.command
         del args.command, args.func, args.workspace
-        # noinspection PyProtectedMember
         args = {name: value for (name, value) in args._get_kwargs()}
         args = namedtuple(cmd.capitalize(), args.keys())(*args.values())
         return self.run(ws, args)
@@ -261,3 +236,74 @@ class Command(abc.ABC):
     @abc.abstractmethod
     def run(self, ws, args):
         raise NotImplementedError
+
+
+def configurable(cls):
+    orig_init = cls.__init__
+    submodules, config = _get_args(orig_init)
+    submodules = submodules[1:]
+
+    def new_init(self, *args, **kwargs):
+        Module.__init__(**ins.getcallargs(
+            orig_init, self, *args, **kwargs))
+        cls.__init__(self, *args, **kwargs)
+
+    @classmethod
+    def add_arguments(_, parser):
+        _add_arguments_by_kwargs(parser, config)
+
+    d = dict(cls.__dict__)
+    d.update(Module.__dict__)
+    d.update(dict(
+        __init__=new_init,
+        add_arguments=add_arguments,
+        submodules=submodules))
+    new_cls = type(cls.__name__, (cls.__base__,), d)
+    register_module(cls.__name__, new_cls)
+    return new_cls
+
+
+def command(f):
+    _args, config = _get_args(f)
+
+    class Cmd(Command):
+        def __init__(self, parser):
+            super().__init__(parser)
+            for arg in _args[1:]:
+                parser.add_argument('-' + arg)
+            _add_arguments_by_kwargs(parser, config)
+
+        def run(self, ws, args):
+            return f(ws, **args._asdict())
+
+    Cmd.__name__ = f.__name__[0].upper() + f.__name__[1:]
+    register_command(f.__name__, Cmd)
+    return f
+
+
+def _get_args(f):
+    spec = ins.getfullargspec(f)
+    n_config = len(spec.defaults) if spec.defaults else 0
+    args = spec.args if n_config == 0 else spec.args[:-n_config]
+    kwargs = [] if n_config == 0 else \
+        [(k, v) for k, v in zip(spec.args[-n_config:], spec.defaults)]
+    return args, kwargs
+
+
+def _add_arguments_by_kwargs(parser, config):
+    for k, v in config:
+        if isinstance(v, tuple):
+            v = {x: y for x, y in v}
+            parser.add_argument('-' + k, **v)
+        else:
+            parser.add_argument('-' + k, default=v, type=type(v))
+
+
+def _sub_class_checker(cls):
+    def rv(obj):
+        if ins.isclass(obj) and not ins.isabstract(obj) \
+                and issubclass(obj, cls):
+            return True
+        else:
+            return False
+    return rv
