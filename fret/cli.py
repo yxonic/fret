@@ -43,7 +43,7 @@ class Config(common.Command):
         subs = parser.add_subparsers(title='modules available', dest='module')
         group_options = collections.defaultdict(set)
         try:
-            _modules = common.registered_modules
+            _modules = common.app['modules']
         except ImportError:
             _modules = {}
 
@@ -139,11 +139,11 @@ def main():
                                              dest='command')
     _subparsers.required = True
 
-    common.register_app()
-    common.register_command('config', Config)
-    common.register_command('clean', Clean)
+    common.get_app()
+    common.register_command(Config)
+    common.register_command(Clean)
 
-    for _cmd, _cls in common.registered_commands.items():
+    for _cmd, _cls in common.app['commands'].items():
         _sub = _subparsers.add_parser(
             _cmd, help=_cls.help,
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)

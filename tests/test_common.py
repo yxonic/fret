@@ -49,6 +49,7 @@ def test_workspace(tmpdir: py.path.local):
 
     ws.save()
     ws2 = fret.Workspace(str(tmpdir.join('ws')))
+    print(fret.common.app)
     assert ws.get_module('main') == ws2.get_module('main')
 
     with pytest.raises(fret.NotConfiguredError) as e:

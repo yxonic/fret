@@ -5,15 +5,12 @@ import inspect as ins
 import logging
 import pathlib
 import sys
-import toml
-
 from collections import namedtuple
 from operator import itemgetter
 
-from . import util
+import toml
 
-registered_commands = {}
-registered_modules = {}
+from . import util
 
 
 class NotConfiguredError(Exception):
@@ -24,81 +21,46 @@ class ParseError(Exception):
     pass
 
 
-def register_app():
+app = {}
+
+
+def get_app():
     sys.path.append('.')
     config = toml.load(open('fret.toml'))
+    app.update(config)
+
     mc = importlib.import_module(config['appname'] + '.command')
     mm = importlib.import_module(config['appname'] + '.module')
 
     for m in ins.getmembers(mc, _sub_class_checker(Command)):
-        register_command(m[0].lower(), m[1])
+        register_command(m[1], m[0].lower())
 
     for m in ins.getmembers(mm, _sub_class_checker(Module)):
-        register_module(m[0], m[1])
+        register_module(m[1], m[0])
 
 
-def register_command(name, cls):
-    registered_commands[name] = cls
+def register_command(cls, name=None):
+    if name is None:
+        name = cls.__name__.lower()
+    if 'commands' not in app:
+        app['commands'] = {}
+    app['commands'][name] = cls
 
 
-def register_module(name, cls):
-    registered_modules[name] = cls
+def register_module(cls, name=None):
+    if name is None:
+        name = cls.__name__
+    if 'modules' not in app:
+        app['modules'] = {}
+    app['modules'][name] = cls
 
 
-class Module(abc.ABC):
-    """Interface for configurable modules.
-
-    Each module class should have an ``configure`` class method to define
-    model arguments along with their types, default values, etc.
-    """
-
-    submodules = []
-
-    @util.classproperty
-    def help(cls):
-        return 'module ' + cls.__name__
-
-    @classmethod
-    def _add_arguments(cls, parser: argparse.ArgumentParser):
-        cls.add_arguments(parser)
-        for submodule in cls.submodules:
-            parser.add_argument('-' + submodule, default=submodule,
-                                help='submodule ' + submodule)
-
-    @classmethod
-    @abc.abstractmethod
-    def add_arguments(cls, parser: argparse.ArgumentParser):
-        """Add arguments to an argparse subparser."""
-        raise NotImplementedError
-
-    @classmethod
-    def parse(cls, args):
-        """Parse command-line options and build module."""
-
-        class _ArgumentParser(argparse.ArgumentParser):
-            def error(self, message):
-                raise ParseError(message)
-
-        parser = _ArgumentParser(prog='', add_help=False)
-        cls._add_arguments(parser)
-        args = parser.parse_args(args)
-        config = dict(args._get_kwargs())
-        return cls(**config)
-
-    def __init__(self, **kwargs):
-        """
-        Args:
-            config (namedtuple): module configuration
-        """
-        keys, values = zip(*sorted(list(kwargs.items()), key=itemgetter(0)))
-        config = namedtuple(self.__class__.__name__, keys)(*values)
-        self.config = config
-
-    def __str__(self):
-        return str(self.config)
-
-    def __repr__(self):
-        return str(self)
+def register_ws_mixin(cls, name=None):
+    if name is None:
+        name = cls.__name__.lower()
+    if 'ws_mixins' not in app:
+        app['ws_mixins'] = {}
+    app['ws_mixins'][name] = cls
 
 
 class Workspace:
@@ -119,7 +81,7 @@ class Workspace:
         self._modules = {}
         config = toml.load(self.config_path.open())
         for name, cfg in config.items():
-            cls = registered_modules[cfg['module']]
+            cls = app['modules'][cfg['module']]
             del cfg['module']
             self.add_module(name, cls, cfg)
 
@@ -215,6 +177,62 @@ class Workspace:
         return 'Workspace(path=' + str(self.path) + ')'
 
 
+class Module(abc.ABC):
+    """Interface for configurable modules.
+
+    Each module class should have an ``configure`` class method to define
+    model arguments along with their types, default values, etc.
+    """
+
+    submodules = []
+
+    @util.classproperty
+    def help(cls):
+        return 'module ' + cls.__name__
+
+    @classmethod
+    def _add_arguments(cls, parser: argparse.ArgumentParser):
+        cls.add_arguments(parser)
+        for submodule in cls.submodules:
+            parser.add_argument('-' + submodule, default=submodule,
+                                help='submodule ' + submodule)
+
+    @classmethod
+    @abc.abstractmethod
+    def add_arguments(cls, parser: argparse.ArgumentParser):
+        """Add arguments to an argparse subparser."""
+        raise NotImplementedError
+
+    @classmethod
+    def parse(cls, args):
+        """Parse command-line options and build module."""
+
+        class _ArgumentParser(argparse.ArgumentParser):
+            def error(self, message):
+                raise ParseError(message)
+
+        parser = _ArgumentParser(prog='', add_help=False)
+        cls._add_arguments(parser)
+        args = parser.parse_args(args)
+        config = dict(args._get_kwargs())
+        return cls(**config)
+
+    def __init__(self, **kwargs):
+        """
+        Args:
+            config (namedtuple): module configuration
+        """
+        keys, values = zip(*sorted(list(kwargs.items()), key=itemgetter(0)))
+        config = namedtuple(self.__class__.__name__, keys)(*values)
+        self.config = config
+
+    def __str__(self):
+        return str(self.config)
+
+    def __repr__(self):
+        return str(self)
+
+
 class Command(abc.ABC):
     """Command interface."""
 
@@ -259,7 +277,7 @@ def configurable(cls):
         add_arguments=add_arguments,
         submodules=submodules))
     new_cls = type(cls.__name__, (cls.__base__,), d)
-    register_module(cls.__name__, new_cls)
+    register_module(new_cls)
     return new_cls
 
 
@@ -277,7 +295,7 @@ def command(f):
             return f(ws, **args._asdict())
 
     Cmd.__name__ = f.__name__[0].upper() + f.__name__[1:]
-    register_command(f.__name__, Cmd)
+    register_command(Cmd)
     return f
 
 
@@ -306,4 +324,5 @@ def _sub_class_checker(cls):
             return True
         else:
             return False
+
     return rv
