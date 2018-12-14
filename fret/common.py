@@ -5,7 +5,7 @@ import inspect as ins
 import logging
 import pathlib
 import sys
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 from operator import itemgetter
 
 import toml
@@ -21,7 +21,7 @@ class ParseError(Exception):
     pass
 
 
-app = {}
+app = defaultdict(dict)
 
 
 def get_app():
@@ -29,49 +29,67 @@ def get_app():
     config = toml.load(open('fret.toml'))
     app.update(config)
 
-    mc = importlib.import_module(config['appname'] + '.command')
-    mm = importlib.import_module(config['appname'] + '.module')
-
-    for m in ins.getmembers(mc, _sub_class_checker(Command)):
+    m = importlib.import_module(config['appname'])
+    for m in ins.getmembers(m, _sub_class_checker(Command)):
         register_command(m[1], m[0].lower())
-
-    for m in ins.getmembers(mm, _sub_class_checker(Module)):
+    for m in ins.getmembers(m, _sub_class_checker(Module)):
         register_module(m[1], m[0])
+
+    try:
+        mc = importlib.import_module(config['appname'] + '.command')
+        for m in ins.getmembers(mc, _sub_class_checker(Command)):
+            register_command(m[1], m[0].lower())
+    except ImportError as e:
+        if (config['appname'] + '.command') in str(e):
+            pass
+        else:
+            raise
+
+    try:
+        mm = importlib.import_module(config['appname'] + '.module')
+        for m in ins.getmembers(mm, _sub_class_checker(Module)):
+            register_module(m[1], m[0])
+    except ImportError:
+        pass
+
+    try:
+        _ = importlib.import_module(config['appname'] + '.plugin')
+    except ImportError:
+        pass
 
 
 def register_command(cls, name=None):
     if name is None:
         name = cls.__name__.lower()
-    if 'commands' not in app:
-        app['commands'] = {}
     app['commands'][name] = cls
 
 
 def register_module(cls, name=None):
     if name is None:
         name = cls.__name__
-    if 'modules' not in app:
-        app['modules'] = {}
     app['modules'][name] = cls
 
 
 def register_ws_mixin(cls, name=None):
     if name is None:
         name = cls.__name__.lower()
-    if 'ws_mixins' not in app:
-        app['ws_mixins'] = {}
     app['ws_mixins'][name] = cls
+
+
+# def workspace(*args, **kwargs):
+#     WS = type('WS', [Workspace] + list(app['ws_mixins'].values()), {})
+#     print(WS)
 
 
 class Workspace:
     """Workspace utilities. One can save/load configurations, build models
-    with specific configuration, save snapshots, open results, etc., using
+    with specific configuration, save checkpoints, open results, etc., using
     workspace objects."""
 
     def __init__(self, path: str):
         self._path = pathlib.Path(path)
         self._log_path = self._path / 'log'
-        self._snapshot_path = self._path / 'snapshot'
+        self._checkpoint_path = self._path / 'checkpoint'
         self._result_path = self._path / 'result'
         self._config_path = self._path / 'config.toml'
         self._modules = None
@@ -106,10 +124,10 @@ class Workspace:
         return self._result_path
 
     @property
-    def snapshot_path(self):
-        if not self._snapshot_path.exists():
-            self._snapshot_path.mkdir(parents=True)
-        return self._snapshot_path
+    def checkpoint_path(self):
+        if not self._checkpoint_path.exists():
+            self._checkpoint_path.mkdir(parents=True)
+        return self._checkpoint_path
 
     @property
     def log_path(self):

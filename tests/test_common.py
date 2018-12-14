@@ -32,7 +32,7 @@ def test_workspace(tmpdir: py.path.local):
     assert str(ws.path) == str(tmpdir.join('ws'))
     assert str(ws.log_path) == str(tmpdir.join('ws/log'))
     assert str(ws.result_path) == str(tmpdir.join('ws/result'))
-    assert str(ws.snapshot_path) == str(tmpdir.join('ws/snapshot'))
+    assert str(ws.checkpoint_path) == str(tmpdir.join('ws/checkpoint'))
 
     # test logging utilities
     logger = ws.logger('test')

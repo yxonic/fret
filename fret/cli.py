@@ -58,14 +58,14 @@ class Config(common.Command):
 
             def save(args):
                 ws = common.Workspace(args.workspace)
-                _module = args.module
+                m = args.module
                 config = {name: value for (name, value) in args._get_kwargs()
-                          if name in group_options[_module]}
+                          if name in group_options[m]}
                 print('[%s] configured "%s" as "%s" with %s' %
-                      (args.workspace, args.name, _module, str(config)),
+                      (args.workspace, args.name, m, str(config)),
                       file=sys.stderr)
                 ws.load()
-                ws.add_module(args.name, module_cls, config)
+                ws.add_module(args.name, _modules[m], config)
                 ws.save()
 
             sub.set_defaults(func=save)
@@ -84,7 +84,7 @@ class Config(common.Command):
 class Clean(common.Command):
     """Command ``clean``.
 
-    Remove all snapshots in specific workspace. If ``--all`` is specified,
+    Remove all checkpoints in specific workspace. If ``--all`` is specified,
     clean the entire workspace
     """
 
@@ -106,7 +106,7 @@ class Clean(common.Command):
                     (ws.path / 'config.toml').unlink()
                 except FileNotFoundError:
                     pass
-            shutil.rmtree(str(ws.snapshot_path))
+            shutil.rmtree(str(ws.checkpoint_path))
 
 
 def real_main(args):
@@ -129,7 +129,11 @@ def real_main(args):
         logger.error('exception occurred: %s', e)
 
 
-def main():
+def main(args=None):
+    common.get_app()
+    common.register_command(Config)
+    common.register_command(Clean)
+
     main_parser.add_argument('-w', '--workspace',
                              help='workspace dir', default='ws/test')
     main_parser.add_argument('-q', action='store_true', help='quiet')
@@ -139,10 +143,6 @@ def main():
                                              dest='command')
     _subparsers.required = True
 
-    common.get_app()
-    common.register_command(Config)
-    common.register_command(Clean)
-
     for _cmd, _cls in common.app['commands'].items():
         _sub = _subparsers.add_parser(
             _cmd, help=_cls.help,
@@ -150,7 +150,8 @@ def main():
         subparsers[_cmd] = _sub
         _sub.set_defaults(func=_cls(_sub)._run)
 
-    _args = main_parser.parse_args()
+    _args = main_parser.parse_args() if args is None \
+        else main_parser.parse_args(args)
 
     # configure logger
     _logger = logging.getLogger()
