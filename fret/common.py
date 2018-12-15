@@ -76,11 +76,6 @@ def register_ws_mixin(cls, name=None):
     app['ws_mixins'][name] = cls
 
 
-# def workspace(*args, **kwargs):
-#     WS = type('WS', [Workspace] + list(app['ws_mixins'].values()), {})
-#     print(WS)
-
-
 class Workspace:
     """Workspace utilities. One can save/load configurations, build models
     with specific configuration, save checkpoints, open results, etc., using
