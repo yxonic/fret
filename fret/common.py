@@ -133,6 +133,7 @@ class Workspace:
     @property
     def config_path(self):
         if not self._config_path.exists():
+            _ = self.path
             self._config_path.open('w').close()
         return self._config_path
 
