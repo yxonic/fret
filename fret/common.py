@@ -3,6 +3,7 @@ import argparse
 import importlib
 import inspect as ins
 import logging
+import os
 import pathlib
 import sys
 from collections import namedtuple, defaultdict
@@ -25,8 +26,16 @@ app = defaultdict(dict)
 
 
 def get_app():
-    sys.path.append('.')
-    config = toml.load(open('fret.toml'))
+    p = pathlib.Path('.').absolute()
+    while p != pathlib.Path(p.root):
+        if (p / 'fret.toml').exists():
+            break
+        p = p.parent
+    sys.path.append(str(p))
+    # noinspection PyTypeChecker
+    app['path'] = str(p)
+
+    config = toml.load((p / 'fret.toml').open())
     app.update(config)
 
     m = importlib.import_module(config['appname'])
@@ -81,7 +90,18 @@ class Workspace:
     with specific configuration, save checkpoints, open results, etc., using
     workspace objects."""
 
-    def __init__(self, path: str):
+    def __init__(self, path):
+        if not path:
+            if str(path) == app['path']:
+                path = 'ws/test'
+            else:
+                path = '.'
+
+        # noinspection PyTypeChecker
+        path = os.path.abspath(path).lstrip(app['path'])
+        # noinspection PyTypeChecker
+        os.chdir(app['path'])
+
         self._path = pathlib.Path(path)
         self._log_path = self._path / 'log'
         self._checkpoint_path = self._path / 'checkpoint'

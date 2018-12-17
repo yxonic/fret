@@ -134,8 +134,7 @@ def main(args=None):
     common.register_command(Config)
     common.register_command(Clean)
 
-    main_parser.add_argument('-w', '--workspace',
-                             help='workspace dir', default='ws/test')
+    main_parser.add_argument('-w', '--workspace', help='workspace dir')
     main_parser.add_argument('-q', action='store_true', help='quiet')
     main_parser.add_argument('-v', action='store_true', help='verbose')
 
