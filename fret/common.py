@@ -180,7 +180,9 @@ class Workspace:
         for sub in cls.submodules:
             if sub in cfg and isinstance(cfg[sub], str):
                 cfg[sub] = self.build_module(sub)
-        return cls(**cfg)
+        obj = cls(**cfg)
+        obj.ws = self
+        return obj
 
     def logger(self, name: str):
         """Get a logger that logs to a file.
