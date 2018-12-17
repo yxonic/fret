@@ -91,14 +91,14 @@ class Workspace:
 
     def __init__(self, path):
         if not path:
-            if str(path) == app['path']:
+            if str(os.getcwd()) == app['path']:
                 path = 'ws/test'
             else:
                 path = '.'
 
         if 'path' in app:
             # record relative path to
-            path = os.path.relpath(app['path'])
+            path = os.path.relpath(path, app['path'])
             os.chdir(app['path'])
 
         self._path = pathlib.Path(path)

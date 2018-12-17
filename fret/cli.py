@@ -62,7 +62,7 @@ class Config(common.Command):
                 config = {name: value for (name, value) in args._get_kwargs()
                           if name in group_options[m]}
                 print('[%s] configured "%s" as "%s" with %s' %
-                      (args.workspace, args.name, m, str(config)),
+                      (ws, args.name, m, str(config)),
                       file=sys.stderr)
                 ws.load()
                 ws.add_module(args.name, _modules[m], config)
