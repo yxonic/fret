@@ -1,3 +1,5 @@
+import os
+
 import py
 import pytest
 
@@ -29,10 +31,12 @@ def test_module():
 
 def test_workspace(tmpdir: py.path.local):
     ws = fret.Workspace(str(tmpdir.join('ws')))
-    assert str(ws.path) == str(tmpdir.join('ws'))
-    assert str(ws.log_path) == str(tmpdir.join('ws/log'))
-    assert str(ws.result_path) == str(tmpdir.join('ws/result'))
-    assert str(ws.checkpoint_path) == str(tmpdir.join('ws/checkpoint'))
+    assert os.path.samefile(str(ws.path), str(tmpdir.join('ws')))
+    assert os.path.samefile(str(ws.log_path), str(tmpdir.join('ws/log')))
+    assert os.path.samefile(str(ws.result_path),
+                            str(tmpdir.join('ws/result')))
+    assert os.path.samefile(str(ws.checkpoint_path),
+                            str(tmpdir.join('ws/checkpoint')))
 
     # test logging utilities
     logger = ws.logger('test')

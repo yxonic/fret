@@ -25,14 +25,13 @@ class ParseError(Exception):
 app = defaultdict(dict)
 
 
-def get_app():
-    p = pathlib.Path('.').absolute()
+def get_app(path='.'):
+    p = pathlib.Path(path).absolute()
     while p != pathlib.Path(p.root):
         if (p / 'fret.toml').exists():
             break
         p = p.parent
     sys.path.append(str(p))
-    # noinspection PyTypeChecker
     app['path'] = str(p)
 
     config = toml.load((p / 'fret.toml').open())
@@ -97,10 +96,10 @@ class Workspace:
             else:
                 path = '.'
 
-        # noinspection PyTypeChecker
-        path = os.path.abspath(path).lstrip(app['path'])
-        # noinspection PyTypeChecker
-        os.chdir(app['path'])
+        if 'path' in app:
+            # record relative path to
+            path = os.path.relpath(app['path'])
+            os.chdir(app['path'])
 
         self._path = pathlib.Path(path)
         self._log_path = self._path / 'log'
