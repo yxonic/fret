@@ -297,9 +297,10 @@ def configurable(cls):
     submodules = submodules[1:]
 
     def new_init(self, *args, **kwargs):
+        # TODO: change default value to None if config not in kwargs
         Module.__init__(**ins.getcallargs(
             orig_init, self, *args, **kwargs))
-        cls.__init__(self, *args, **kwargs)
+        orig_init(self, *args, **kwargs)
 
     @classmethod
     def add_arguments(_, parser):
@@ -345,8 +346,23 @@ def _get_args(f):
 
 def _add_arguments_by_kwargs(parser, config):
     for k, v in config:
+        # TODO: add arg style (java/gnu)
         if isinstance(v, tuple):
-            v = {x: y for x, y in v}
+            if len(v) > 0 and isinstance(v[0], tuple):
+                # kwargs for parser.add_argument
+                v = {x: y for x, y in v}
+            else:
+                # just default value and help
+                nv = {
+                    'default': v[0],
+                    'type': type(v[0]),
+                    'help': v[1]
+                } if v[0] is not None else {
+                    'help': v[1]
+                }
+                if len(v) > 2:
+                    nv['choices'] = v[2]
+                v = nv
             parser.add_argument('-' + k, **v)
         else:
             parser.add_argument('-' + k, default=v, type=type(v))
