@@ -22,6 +22,10 @@ class ParseError(Exception):
     pass
 
 
+class NoWorkspaceError(Exception):
+    pass
+
+
 app = defaultdict(dict)
 
 
@@ -221,12 +225,25 @@ class Module(abc.ABC):
 
     submodules = []
 
+    @property
+    def ws(self):
+        if self._ws is not None:
+            return self._ws
+        raise NoWorkspaceError('should be run in a workspace')
+
+    @ws.setter
+    def ws(self, ws):
+        self._ws = ws
+
     @util.classproperty
     def help(cls):
         return 'module ' + cls.__name__
 
     @classmethod
     def _add_arguments(cls, parser: argparse.ArgumentParser):
+        for base_cls in cls.__bases__:
+            if hasattr(base_cls, 'add_arguments'):
+                base_cls.add_arguments(parser)
         cls.add_arguments(parser)
         for submodule in cls.submodules:
             parser.add_argument('-' + submodule, default=submodule,
@@ -260,6 +277,7 @@ class Module(abc.ABC):
         keys, values = zip(*sorted(list(kwargs.items()), key=itemgetter(0)))
         config = namedtuple(self.__class__.__name__, keys)(*values)
         self.config = config
+        self._ws = None
 
     def __str__(self):
         return str(self.config)
@@ -283,7 +301,7 @@ class Command(abc.ABC):
         cmd = args.command
         del args.command, args.func, args.workspace
         args = {name: value for (name, value) in args._get_kwargs()}
-        args = namedtuple(cmd.capitalize(), args.keys())(*args.values())
+        args = namedtuple(cmd, args.keys())(*args.values())
         return self.run(ws, args)
 
     @abc.abstractmethod
@@ -296,15 +314,23 @@ def configurable(cls):
     submodules, config = _get_args(orig_init)
     submodules = submodules[1:]
 
-    def new_init(self, *args, **kwargs):
-        # TODO: change default value to None if config not in kwargs
-        Module.__init__(**ins.getcallargs(
-            orig_init, self, *args, **kwargs))
-        orig_init(self, *args, **kwargs)
-
     @classmethod
     def add_arguments(_, parser):
         _add_arguments_by_kwargs(parser, config)
+
+    def new_init(self, *args, **kwargs):
+        cfg = {k: v for k, v in config}
+        cfg.update(kwargs)
+        for k in cfg:
+            v = cfg[k]
+            if isinstance(v, tuple):
+                cfg[k] = v[0]
+            elif isinstance(v, dict):
+                cfg[k] = v.get('default')
+        if not hasattr(self, 'config'):
+            Module.__init__(**ins.getcallargs(
+                orig_init, self, *args, **cfg))
+        orig_init(self, *args, **cfg)
 
     d = dict(cls.__dict__)
     d.update(Module.__dict__)
@@ -328,6 +354,7 @@ def command(f):
             _add_arguments_by_kwargs(parser, config)
 
         def run(self, ws, args):
+            f.args = args
             return f(ws, **args._asdict())
 
     Cmd.__name__ = f.__name__[0].upper() + f.__name__[1:]
