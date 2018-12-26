@@ -7,6 +7,7 @@ import os
 import pathlib
 import sys
 from collections import namedtuple, defaultdict
+from collections.__init__ import defaultdict
 from operator import itemgetter
 
 import toml
@@ -117,15 +118,15 @@ class Workspace:
         self._modules = {}
         config = toml.load(self.config_path.open())
         for name, cfg in config.items():
-            cls = app['modules'][cfg['module']]
+            cls_name = cfg['module']
             del cfg['module']
-            self.add_module(name, cls, cfg)
+            self.add_module(name, cls_name, cfg)
 
     def save(self):
         """Save configuration."""
         f = self.config_path.open('w')
-        cfg = {name: dict({'module': cls.__name__}, **cfg)
-               for name, (cls, cfg) in self._modules.items()}
+        cfg = {name: dict({'module': cls_name}, **cfg)
+               for name, (cls_name, cfg) in self._modules.items()}
         toml.dump(cfg, f)
         f.close()
 
@@ -164,7 +165,8 @@ class Workspace:
         if self._modules is None:
             self.load()
         if config is None:
-            self._modules[name] = (module.__class__, module.config._asdict())
+            self._modules[name] = (module.__class__.__name__,
+                                   module.config._asdict())
         else:
             self._modules[name] = (module, config)
 
@@ -179,11 +181,16 @@ class Workspace:
     def build_module(self, name='main'):
         """Build module according to the configurations in current
         workspace."""
-        cls, cfg = self.get_module(name)
+        cls_name, cfg = self.get_module(name)
+        try:
+            cls = app['modules'][cls_name]
+        except KeyError:
+            raise KeyError('definition of module %s not found', cls_name)
 
         for sub in cls.submodules:
             if sub in cfg and isinstance(cfg[sub], str):
                 cfg[sub] = self.build_module(sub)
+        # noinspection PyCallingNonCallable
         obj = cls(**cfg)
         obj.ws = self
         return obj

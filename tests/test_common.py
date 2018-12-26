@@ -47,7 +47,7 @@ def test_workspace(tmpdir: py.path.local):
     logger.error('test log 2')
     assert len(list((ws.log_path / 'test.log').open())) == 2
 
-    ws.add_module('main', ModuleTest, dict(x=3, y=4))
+    ws.add_module('main', 'ModuleTest', dict(x=3, y=4))
     module = ws.build_module()
     assert str(module.config) == 'ModuleTest(x=3, y=4)'
 
@@ -61,7 +61,7 @@ def test_workspace(tmpdir: py.path.local):
     assert str(e.value) == 'module wrong not configured'
 
     ws.add_module('test', SubModuleTest.parse([]))
-    ws.add_module('sub', ModuleTest, dict(x=3, y=4))
+    ws.add_module('sub', 'ModuleTest', dict(x=3, y=4))
 
     assert str(ws.build_module('test')) == \
         'SubModuleTest(sub=ModuleTest(x=3, y=4), z=5)'

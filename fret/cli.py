@@ -65,7 +65,7 @@ class Config(common.Command):
                       (ws, args.name, m, str(config)),
                       file=sys.stderr)
                 ws.load()
-                ws.add_module(args.name, _modules[m], config)
+                ws.add_module(args.name, m, config)
                 ws.save()
 
             sub.set_defaults(func=save)
