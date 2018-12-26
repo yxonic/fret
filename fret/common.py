@@ -7,7 +7,6 @@ import os
 import pathlib
 import sys
 from collections import namedtuple, defaultdict
-from collections.__init__ import defaultdict
 from operator import itemgetter
 
 import toml
@@ -182,6 +181,7 @@ class Workspace:
         """Build module according to the configurations in current
         workspace."""
         cls_name, cfg = self.get_module(name)
+        cfg = cfg.copy()
         try:
             cls = app['modules'][cls_name]
         except KeyError:
@@ -190,10 +190,24 @@ class Workspace:
         for sub in cls.submodules:
             if sub in cfg and isinstance(cfg[sub], str):
                 cfg[sub] = self.build_module(sub)
+
+        for k, v in cfg.items():
+            if isinstance(v, str) and v.startswith('ref('):
+                cfg[k] = self.deref(v[4:-1])  # remove 'ref()'
+
         # noinspection PyCallingNonCallable
         obj = cls(**cfg)
         obj.ws = self
         return obj
+
+    def deref(self, r):
+        *modules, attr = r.split('.')
+        name = 'main'
+        cfg = self.get_module(name)[1]
+        for m in modules:
+            name = cfg[m]
+            cfg = self.get_module(name)[1]
+        return cfg[attr]
 
     def logger(self, name: str):
         """Get a logger that logs to a file.
@@ -381,6 +395,8 @@ def _get_args(f):
 def _add_arguments_by_kwargs(parser, config):
     for k, v in config:
         # TODO: add arg style (java/gnu)
+        if isinstance(v, ref):
+            continue
         if isinstance(v, tuple):
             if len(v) > 0 and isinstance(v[0], tuple):
                 # kwargs for parser.add_argument
@@ -411,3 +427,14 @@ def _sub_class_checker(cls):
             return False
 
     return rv
+
+
+class ref:
+    def __init__(self, attr):
+        self.attr = attr
+
+    def __str__(self):
+        return 'ref(%s)' % self.attr
+
+    def __repr__(self):
+        return str(self)
