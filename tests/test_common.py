@@ -49,7 +49,7 @@ def test_workspace(tmpdir: py.path.local):
 
     ws.add_module('main', 'ModuleTest', dict(x=3, y=4))
     module = ws.build_module()
-    assert str(module.config) == 'ModuleTest(x=3, y=4)'
+    assert module.config == dict(x=3, y=4)
 
     ws.save()
     ws2 = fret.Workspace(str(tmpdir.join('ws')))

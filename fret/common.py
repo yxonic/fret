@@ -165,7 +165,7 @@ class Workspace:
             self.load()
         if config is None:
             self._modules[name] = (module.__class__.__name__,
-                                   module.config._asdict())
+                                   module.config)
         else:
             self._modules[name] = (module, config)
 
@@ -177,11 +177,13 @@ class Workspace:
         else:
             raise NotConfiguredError('module %s not configured' % name)
 
-    def build_module(self, name='main'):
+    def build_module(self, name='main', **kwargs):
         """Build module according to the configurations in current
         workspace."""
         cls_name, cfg = self.get_module(name)
         cfg = cfg.copy()
+        cfg.update(kwargs)
+
         try:
             cls = app['modules'][cls_name]
         except KeyError:
@@ -189,25 +191,12 @@ class Workspace:
 
         for sub in cls.submodules:
             if sub in cfg and isinstance(cfg[sub], str):
-                cfg[sub] = self.build_module(sub)
-
-        for k, v in cfg.items():
-            if isinstance(v, str) and v.startswith('ref('):
-                cfg[k] = self.deref(v[4:-1])  # remove 'ref()'
+                cfg[sub] = _Builder(self, cfg[sub])
 
         # noinspection PyCallingNonCallable
         obj = cls(**cfg)
         obj.ws = self
         return obj
-
-    def deref(self, r):
-        *modules, attr = r.split('.')
-        name = 'main'
-        cfg = self.get_module(name)[1]
-        for m in modules:
-            name = cfg[m]
-            cfg = self.get_module(name)[1]
-        return cfg[attr]
 
     def logger(self, name: str):
         """Get a logger that logs to a file.
@@ -262,10 +251,9 @@ class Module(abc.ABC):
 
     @classmethod
     def _add_arguments(cls, parser: argparse.ArgumentParser):
-        for base_cls in cls.__bases__:
+        for base_cls in reversed(cls.__mro__):
             if hasattr(base_cls, 'add_arguments'):
                 base_cls.add_arguments(parser)
-        cls.add_arguments(parser)
         for submodule in cls.submodules:
             parser.add_argument('-' + submodule, default=submodule,
                                 help='submodule ' + submodule)
@@ -293,15 +281,13 @@ class Module(abc.ABC):
     def __init__(self, **kwargs):
         """
         Args:
-            config (namedtuple): module configuration
+            config (dict): module configuration
         """
-        keys, values = zip(*sorted(list(kwargs.items()), key=itemgetter(0)))
-        config = namedtuple(self.__class__.__name__, keys)(*values)
-        self.config = config
+        self.config = kwargs
         self._ws = None
 
     def __str__(self):
-        return str(self.config)
+        return _pretty_str(self.__class__.__name__, self.config)
 
     def __repr__(self):
         return str(self)
@@ -333,7 +319,7 @@ class Command(abc.ABC):
 def configurable(cls):
     orig_init = cls.__init__
     submodules, config = _get_args(orig_init)
-    submodules = submodules[1:]
+    submodules = [s for s in submodules[1:] if not s.startswith('_')]
 
     @classmethod
     def add_arguments(_, parser):
@@ -360,7 +346,8 @@ def configurable(cls):
         add_arguments=add_arguments,
         submodules=submodules))
     new_cls = type(cls.__name__, (cls.__base__,), d)
-    register_module(new_cls)
+    if not cls.__name__.startswith('_'):
+        register_module(new_cls)
     return new_cls
 
 
@@ -395,7 +382,7 @@ def _get_args(f):
 def _add_arguments_by_kwargs(parser, config):
     for k, v in config:
         # TODO: add arg style (java/gnu)
-        if isinstance(v, ref):
+        if isinstance(v, str) and v.startswith('_'):
             continue
         if isinstance(v, tuple):
             if len(v) > 0 and isinstance(v[0], tuple):
@@ -403,38 +390,60 @@ def _add_arguments_by_kwargs(parser, config):
                 v = {x: y for x, y in v}
             else:
                 # just default value and help
-                nv = {
-                    'default': v[0],
-                    'type': type(v[0]),
-                    'help': v[1]
-                } if v[0] is not None else {
-                    'help': v[1]
-                }
+                if isinstance(v[0], bool):
+                    nv = {
+                        'action': 'store_%s' % str(not v[0]).lower(),
+                        'default': v[0],
+                        'help': v[1]
+                    }
+                else:
+                    nv = {
+                        'default': v[0],
+                        'type': type(v[0]),
+                        'help': v[1]
+                    } if v[0] is not None else {
+                        'help': v[1]
+                    }
                 if len(v) > 2:
                     nv['choices'] = v[2]
                 v = nv
             parser.add_argument('-' + k, **v)
         else:
-            parser.add_argument('-' + k, default=v, type=type(v))
+            if isinstance(v, bool):
+                parser.add_argument('-' + k, default=v,
+                                    action='store_%s' % str(not v).lower(),
+                                    help='argument %s' % k)
+            else:
+                parser.add_argument('-' + k, default=v, type=type(v),
+                                    help='argument %s' % k)
 
 
 def _sub_class_checker(cls):
     def rv(obj):
-        if ins.isclass(obj) and not ins.isabstract(obj) \
-                and issubclass(obj, cls):
-            return True
-        else:
-            return False
+        return ins.isclass(obj) and \
+            not obj.__name__.startswith('_') and \
+            issubclass(obj, cls)
 
     return rv
 
 
-class ref:
-    def __init__(self, attr):
-        self.attr = attr
+class _Builder:
+    def __init__(self, ws, name):
+        self.ws = ws
+        self.name = name
+
+    def __call__(self, **kwargs):
+        return self.ws.build_module(self.name, **kwargs)
 
     def __str__(self):
-        return 'ref(%s)' % self.attr
+        return _pretty_str(*self.ws.get_module(self.name))
 
     def __repr__(self):
         return str(self)
+
+
+def _pretty_str(cls_name, cfg):
+    return cls_name + '(' + \
+        ', '.join([str(k) + '=' + str(v) for k, v in
+                   sorted(list(cfg.items()),
+                          key=itemgetter(0))]) + ')'
