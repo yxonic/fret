@@ -382,7 +382,7 @@ def _get_args(f):
 def _add_arguments_by_kwargs(parser, config):
     for k, v in config:
         # TODO: add arg style (java/gnu)
-        if isinstance(v, str) and v.startswith('_'):
+        if isinstance(k, str) and k.startswith('_'):
             continue
         if isinstance(v, tuple):
             if len(v) > 0 and isinstance(v[0], tuple):
