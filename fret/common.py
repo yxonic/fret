@@ -1,5 +1,6 @@
 import abc
 import argparse
+import functools
 import importlib
 import inspect as ins
 import logging
@@ -38,7 +39,11 @@ def get_app(path='.'):
     sys.path.append(str(p))
     app['path'] = str(p)
 
-    config = toml.load((p / 'fret.toml').open())
+    try:
+        config = toml.load((p / 'fret.toml').open())
+    except FileNotFoundError:
+        return
+
     app.update(config)
 
     m = importlib.import_module(config['appname'])
@@ -367,7 +372,25 @@ def command(f):
 
     Cmd.__name__ = f.__name__[0].upper() + f.__name__[1:]
     register_command(Cmd)
-    return f
+
+    @functools.wraps(f)
+    def new_f(*args, **kwargs):
+        cfg = {}
+        for k, v in config:
+            if isinstance(v, tuple):
+                cfg[k] = v[0]
+            elif isinstance(v, arg):
+                cfg[k] = v.kwargs.get('default')
+            else:
+                cfg[k] = v
+        cfg.update(kwargs)
+        f_args = {k: v for k, v in zip(_args[1:], args[1:])}
+        f_args.update(cfg)
+        # TODO: make an util class for this
+        new_f.args = namedtuple(f.__name__, f_args.keys())(*f_args.values())
+        return f(*args, **cfg)
+
+    return new_f
 
 
 def _get_args(f):
@@ -381,7 +404,7 @@ def _get_args(f):
 
 def _add_arguments_by_kwargs(parser, config):
     for k, v in config:
-        # TODO: add arg style (java/gnu)
+        # TODO: add arg style (java/gnu), better logic
         if isinstance(k, str) and k.startswith('_'):
             continue
         if isinstance(v, tuple):
@@ -393,8 +416,14 @@ def _add_arguments_by_kwargs(parser, config):
                 if isinstance(v[0], bool):
                     nv = {
                         'action': 'store_%s' % str(not v[0]).lower(),
-                        'default': v[0],
                         'help': v[1]
+                    }
+                elif isinstance(v[0], list):
+                    nv = {
+                        'default': v[0],
+                        'help': v[1],
+                        'nargs': '+' if v[0] else '*',
+                        'type': type(v[0][0]) if v[0] else str
                     }
                 else:
                     nv = {
@@ -408,14 +437,15 @@ def _add_arguments_by_kwargs(parser, config):
                     nv['choices'] = v[2]
                 v = nv
             parser.add_argument('-' + k, **v)
+        elif isinstance(v, arg):
+            parser.add_argument('-' + k, *v.args, **v.kwargs)
+        elif isinstance(v, bool):
+            parser.add_argument('-' + k,
+                                action='store_%s' % str(not v).lower(),
+                                help='argument %s' % k)
         else:
-            if isinstance(v, bool):
-                parser.add_argument('-' + k, default=v,
-                                    action='store_%s' % str(not v).lower(),
-                                    help='argument %s' % k)
-            else:
-                parser.add_argument('-' + k, default=v, type=type(v),
-                                    help='argument %s' % k)
+            parser.add_argument('-' + k, default=v, type=type(v),
+                                help='argument %s' % k)
 
 
 def _sub_class_checker(cls):
@@ -447,3 +477,13 @@ def _pretty_str(cls_name, cfg):
         ', '.join([str(k) + '=' + str(v) for k, v in
                    sorted(list(cfg.items()),
                           key=itemgetter(0))]) + ')'
+
+
+class arg:
+    def __init__(self, *args, **kwargs):
+        self.args = args
+        self.kwargs = kwargs
+
+
+def workspace(path):
+    return Workspace(path)

@@ -8,10 +8,12 @@ Framework for Reproducible ExperimenTs
 - [x] Better configuration logic
 - [x] `@fret.configurable` for modules
 - [x] `@fret.command` for commands
+- [ ] Parameter check
+- [ ] Java/GNU style command line args, shorthands, better logic for boolean default value
 - [ ] Global configuration file: `fret.toml`
-- [ ] Workspace plugin system and plugins for torch and tf (try python mixin)
-- [ ] Test coverage
-- [ ] workspace utils (for snapshots, results, etc.)
+- [ ] `fret` global app object (singleton)
+- [ ] `fret.workspace` function supporting Workspace plugin system; plugins for torch, tf, etc.
+- [ ] Tests for cli
 - [ ] Documents and examples
 - [ ] `fret new` command
-- [ ] Other fret commands like log, show config, etc.
+- [ ] Other fret commands like show log, check module, etc.
