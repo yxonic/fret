@@ -359,20 +359,6 @@ def configurable(cls):
 def command(f):
     _args, config = _get_args(f)
 
-    class Cmd(Command):
-        def __init__(self, parser):
-            super().__init__(parser)
-            for arg in _args[1:]:
-                parser.add_argument('-' + arg)
-            _add_arguments_by_kwargs(parser, config)
-
-        def run(self, ws, args):
-            f.args = args
-            return f(ws, **args._asdict())
-
-    Cmd.__name__ = f.__name__[0].upper() + f.__name__[1:]
-    register_command(Cmd)
-
     @functools.wraps(f)
     def new_f(*args, **kwargs):
         cfg = {}
@@ -389,6 +375,19 @@ def command(f):
         # TODO: make an util class for this
         new_f.args = namedtuple(f.__name__, f_args.keys())(*f_args.values())
         return f(*args, **cfg)
+
+    class Cmd(Command):
+        def __init__(self, parser):
+            super().__init__(parser)
+            for arg in _args[1:]:
+                parser.add_argument('-' + arg)
+            _add_arguments_by_kwargs(parser, config)
+
+        def run(self, ws, args):
+            return new_f(ws, **args._asdict())
+
+    Cmd.__name__ = f.__name__[0].upper() + f.__name__[1:]
+    register_command(Cmd)
 
     return new_f
 
