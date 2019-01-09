@@ -96,6 +96,8 @@ class Clean(common.Command):
                             help='clean the entire workspace')
         parser.add_argument('-c', dest='config', action='store_true',
                             help='clear workspace configuration')
+        parser.add_argument('-l', dest='log', action='store_true',
+                            help='clear workspace logs')
 
     def run(self, ws, args):
         if args.all:
@@ -106,7 +108,10 @@ class Clean(common.Command):
                     (ws.path / 'config.toml').unlink()
                 except FileNotFoundError:
                     pass
-            shutil.rmtree(str(ws.checkpoint_path))
+            if args.log:
+                shutil.rmtree(str(ws.log_path))
+            else:
+                shutil.rmtree(str(ws.checkpoint_path))
 
 
 def real_main(args):

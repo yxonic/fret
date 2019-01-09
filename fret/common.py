@@ -267,7 +267,7 @@ class Module(abc.ABC):
     @abc.abstractmethod
     def add_arguments(cls, parser: argparse.ArgumentParser):
         """Add arguments to an argparse subparser."""
-        raise NotImplementedError
+        pass
 
     @classmethod
     def parse(cls, args):
@@ -331,10 +331,13 @@ def configurable(cls):
         _add_arguments_by_kwargs(parser, config)
 
     def new_init(self, *args, **kwargs):
-        cfg = {k: v for k, v in config}
+        _cfg = {k: v for k, v in config}
+        cfg = _cfg.copy()
         cfg.update(kwargs)
         for k in cfg:
             v = cfg[k]
+            if v != _cfg.get(k):
+                continue
             if isinstance(v, tuple):
                 cfg[k] = v[0]
             elif isinstance(v, dict):
@@ -402,10 +405,34 @@ def _get_args(f):
 
 
 def _add_arguments_by_kwargs(parser, config):
+    abbrs = set()
     for k, v in config:
         # TODO: add arg style (java/gnu), better logic
         if isinstance(k, str) and k.startswith('_'):
             continue
+
+        if '_' in k:
+            parts = k.split('_')
+            abbr = ''.join(p[:1] for p in parts)
+        else:
+            i = 1
+            while k[:i] in abbrs and i < len(k):
+                i += 1
+            abbr = k[:i]
+
+        if abbr not in abbrs:
+            abbrs.add(abbr)
+            args = ['-' + k, '-' + abbr]
+        else:
+            args = ['-' + k]
+
+        if isinstance(v, arg):
+            if v.args:
+                parser.add_argument(*v.args, **v.kwargs)
+            else:
+                parser.add_argument(*args, **v.kwargs)
+            continue
+
         if isinstance(v, tuple):
             if len(v) > 0 and isinstance(v[0], tuple):
                 # kwargs for parser.add_argument
@@ -413,10 +440,19 @@ def _add_arguments_by_kwargs(parser, config):
             else:
                 # just default value and help
                 if isinstance(v[0], bool):
-                    nv = {
-                        'action': 'store_%s' % str(not v[0]).lower(),
-                        'help': v[1]
-                    }
+                    if v[0]:
+                        nv = {
+                            'action': 'store_false',
+                            'help': v[1],
+                            'dest': k
+
+                        }
+                        args[0] = '-no' + k
+                    else:
+                        nv = {
+                            'action': 'store_true',
+                            'help': v[1]
+                        }
                 elif isinstance(v[0], list):
                     nv = {
                         'default': v[0],
@@ -435,15 +471,17 @@ def _add_arguments_by_kwargs(parser, config):
                 if len(v) > 2:
                     nv['choices'] = v[2]
                 v = nv
-            parser.add_argument('-' + k, **v)
-        elif isinstance(v, arg):
-            parser.add_argument('-' + k, *v.args, **v.kwargs)
+            parser.add_argument(*args, **v)
         elif isinstance(v, bool):
-            parser.add_argument('-' + k,
-                                action='store_%s' % str(not v).lower(),
-                                help='argument %s' % k)
+            if v:
+                args[0] = '-no' + k
+                parser.add_argument(*args, action='store_false',
+                                    help='argument %s' % k, dest=k)
+            else:
+                parser.add_argument(*args, action='store_true',
+                                    help='argument %s' % k)
         else:
-            parser.add_argument('-' + k, default=v, type=type(v),
+            parser.add_argument(*args, default=v, type=type(v),
                                 help='argument %s' % k)
 
 
@@ -459,23 +497,32 @@ def _sub_class_checker(cls):
 class _Builder:
     def __init__(self, ws, name):
         self.ws = ws
-        self.name = name
+        self._name = name
 
     def __call__(self, **kwargs):
-        return self.ws.build_module(self.name, **kwargs)
+        return self.ws.build_module(self._name, **kwargs)
 
     def __str__(self):
-        return _pretty_str(*self.ws.get_module(self.name))
+        return _pretty_str(*self.ws.get_module(self._name))
 
     def __repr__(self):
         return str(self)
+
+    def __getattr__(self, item):
+        cls_name = self.ws.get_module(self._name)[0]
+        try:
+            cls = app['modules'][cls_name]
+        except KeyError:
+            raise KeyError('definition of module %s not found', cls_name)
+        return getattr(cls, item)
 
 
 def _pretty_str(cls_name, cfg):
     return cls_name + '(' + \
         ', '.join([str(k) + '=' + str(v) for k, v in
                    sorted(list(cfg.items()),
-                          key=itemgetter(0))]) + ')'
+                          key=itemgetter(0))
+                   if not k.startswith('_')]) + ')'
 
 
 class arg:
