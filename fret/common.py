@@ -414,13 +414,15 @@ def _add_arguments_by_kwargs(parser, config):
         if '_' in k:
             parts = k.split('_')
             abbr = ''.join(p[:1] for p in parts)
-        else:
+        elif len(k) > 1:
             i = 1
             while k[:i] in abbrs and i < len(k):
                 i += 1
             abbr = k[:i]
+        else:
+            abbr = None
 
-        if abbr not in abbrs:
+        if abbr is not None and abbr not in abbrs:
             abbrs.add(abbr)
             args = ['-' + k, '-' + abbr]
         else:
