@@ -8,6 +8,7 @@ Framework for Reproducible ExperimenTs
 - [x] Better configuration logic
 - [x] `@fret.configurable` for modules
 - [x] `@fret.command` for commands
+- [ ] More convenient configuration data class
 - [ ] Parameter check
 - [ ] Java/GNU style command line args, shorthands, better logic for boolean default value
 - [ ] Global configuration file: `fret.toml`

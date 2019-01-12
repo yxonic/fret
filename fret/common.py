@@ -170,7 +170,7 @@ class Workspace:
             self.load()
         if config is None:
             self._modules[name] = (module.__class__.__name__,
-                                   module.config)
+                                   module.config._asdict())
         else:
             self._modules[name] = (module, config)
 
@@ -288,11 +288,11 @@ class Module(abc.ABC):
         Args:
             config (dict): module configuration
         """
-        self.config = kwargs
+        self.config = _config(kwargs)
         self._ws = None
 
     def __str__(self):
-        return _pretty_str(self.__class__.__name__, self.config)
+        return _pretty_str(self.__class__.__name__, self.config._asdict())
 
     def __repr__(self):
         return str(self)
@@ -323,7 +323,7 @@ class Command(abc.ABC):
 
 def configurable(cls):
     orig_init = cls.__init__
-    submodules, config = _get_args(orig_init)
+    submodules, config, varkw = _get_args(orig_init)
     submodules = [s for s in submodules[1:] if not s.startswith('_')]
 
     @classmethod
@@ -343,16 +343,19 @@ def configurable(cls):
             elif isinstance(v, dict):
                 cfg[k] = v.get('default')
         if not hasattr(self, 'config'):
-            Module.__init__(**ins.getcallargs(
-                orig_init, self, *args, **cfg))
+            _arg = ins.getcallargs(orig_init, self, *args, **cfg)
+            del _arg[varkw]
+            _arg.update(cfg)
+            Module.__init__(**_arg)
         orig_init(self, *args, **cfg)
 
     d = dict(cls.__dict__)
     d.update(Module.__dict__)
     d.update(dict(
         __init__=new_init,
-        add_arguments=add_arguments,
-        submodules=submodules))
+        add_arguments=add_arguments))
+    if 'submodules' not in d:
+        d['submodules'] = submodules
     new_cls = type(cls.__name__, (cls.__base__,), d)
     if not cls.__name__.startswith('_'):
         register_module(new_cls)
@@ -360,7 +363,7 @@ def configurable(cls):
 
 
 def command(f):
-    _args, config = _get_args(f)
+    _args, config, _ = _get_args(f)
 
     @functools.wraps(f)
     def new_f(*args, **kwargs):
@@ -401,7 +404,7 @@ def _get_args(f):
     args = spec.args if n_config == 0 else spec.args[:-n_config]
     kwargs = [] if n_config == 0 else \
         [(k, v) for k, v in zip(spec.args[-n_config:], spec.defaults)]
-    return args, kwargs
+    return args, kwargs, spec.varkw
 
 
 def _add_arguments_by_kwargs(parser, config):
@@ -535,3 +538,39 @@ class arg:
 
 def workspace(path):
     return Workspace(path)
+
+
+class _config:
+    def __init__(self, cfg):
+        self.cfg = cfg
+
+    def __getattr__(self, item):
+        v = self.cfg.get(item)
+        if isinstance(v, dict):
+            return _config(v)
+        else:
+            return v
+
+    def __getitem__(self, item):
+        return self.cfg[item]
+
+    def __setitem__(self, key, value):
+        self.cfg[key] = value
+
+    def get(self, item):
+        return self.cfg.get(item)
+
+    def _asdict(self):
+        return self.cfg
+
+    def __str__(self):
+        return ', '.join([str(k) + '=' + str(v) for k, v in
+                          sorted(list(self.cfg.items()),
+                                 key=itemgetter(0))
+                          if not k.startswith('_')])
+
+    def __eq__(self, other):
+        return self.cfg == other.cfg
+
+
+config = _config(app)
