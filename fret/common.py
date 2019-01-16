@@ -485,6 +485,8 @@ def _add_arguments_by_kwargs(parser, config):
             else:
                 parser.add_argument(*args, action='store_true',
                                     help='argument %s' % k)
+        elif v is None:
+            parser.add_argument(*args, help='argument %s' % k)
         else:
             parser.add_argument(*args, default=v, type=type(v),
                                 help='argument %s' % k)
