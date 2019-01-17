@@ -551,6 +551,12 @@ class _config:
     def __init__(self, cfg):
         self.cfg = cfg
 
+    def __setstate__(self, state):
+        self.cfg = state
+
+    def __getstate__(self):
+        return self.cfg
+
     def __getattr__(self, item):
         v = self.cfg.get(item)
         if isinstance(v, dict):
