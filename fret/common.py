@@ -344,7 +344,8 @@ def configurable(cls):
                 cfg[k] = v.get('default')
         if not hasattr(self, 'config'):
             _arg = ins.getcallargs(orig_init, self, *args, **cfg)
-            del _arg[varkw]
+            if varkw is not None:
+                del _arg[varkw]
             _arg.update(cfg)
             Module.__init__(**_arg)
         orig_init(self, *args, **cfg)
@@ -354,8 +355,12 @@ def configurable(cls):
     d.update(dict(
         __init__=new_init,
         add_arguments=add_arguments))
-    if 'submodules' not in d:
+
+    if 'submodules' not in cls.__dict__:
         d['submodules'] = submodules
+    else:
+        d['submodules'] = cls.submodules
+
     new_cls = type(cls.__name__, (cls.__base__,), d)
     if not cls.__name__.startswith('_'):
         register_module(new_cls)
