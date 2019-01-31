@@ -224,6 +224,9 @@ class Workspace:
         logger.addHandler(file_handler)
         return logger
 
+    def run(self, tag, resume=True):
+        return Run(self, tag, resume)
+
     def __str__(self):
         return str(self.path)
 
@@ -231,7 +234,7 @@ class Workspace:
         return 'Workspace(path=' + str(self.path) + ')'
 
 
-class Module(abc.ABC):
+class Module:
     """Interface for configurable modules.
 
     Each module class should have an ``configure`` class method to define
@@ -264,7 +267,6 @@ class Module(abc.ABC):
                                 help='submodule ' + submodule)
 
     @classmethod
-    @abc.abstractmethod
     def add_arguments(cls, parser: argparse.ArgumentParser):
         """Add arguments to an argparse subparser."""
         pass
@@ -323,48 +325,65 @@ class Command(abc.ABC):
 
 def configurable(cls):
     orig_init = cls.__init__
-    submodules, config, varkw = _get_args(orig_init)
-    submodules = [s for s in submodules[1:] if not s.startswith('_')]
+    positional, config, varkw = _get_args(orig_init)
+    submodules = [s for s in positional[1:] if not s.startswith('_')]
+    if 'submodules' not in cls.__dict__:
+        setattr(cls, 'submodules', submodules)
 
     @classmethod
     def add_arguments(_, parser):
         _add_arguments_by_kwargs(parser, config)
 
     def new_init(self, *args, **kwargs):
-        _cfg = {k: v for k, v in config}
-        cfg = _cfg.copy()
-        cfg.update(kwargs)
-        for k in cfg:
+        # get config from signature
+        allowed_args = set(positional[1:]) | set(x[0] for x in config)
+        cfg = ins.getcallargs(orig_init, self, *args,
+                              **{k: v for k, v in kwargs.items()
+                                 if k in allowed_args})
+        del cfg['self']
+
+        defaults = {k: v for k, v in config}
+        for k in defaults:
             v = cfg[k]
-            if v != _cfg.get(k):
+            if v != defaults[k]:
                 continue
             if isinstance(v, tuple):
-                cfg[k] = v[0]
-            elif isinstance(v, dict):
-                cfg[k] = v.get('default')
+                if isinstance(v[0], tuple):
+                    cfg[k] = {k_: v_ for k_, v_ in v}.get('default')
+                else:
+                    cfg[k] = v[0]
+
         if not hasattr(self, 'config'):
-            _arg = ins.getcallargs(orig_init, self, *args, **cfg)
-            if varkw is not None:
-                del _arg[varkw]
-            _arg.update(cfg)
-            Module.__init__(**_arg)
-        orig_init(self, *args, **cfg)
+            _cfg = cfg.copy()
+            _cfg.update(kwargs)
+            Module.__init__(self, **_cfg)
+        else:
+            # update config with function default values
+            for k, v in cfg.items():
+                if k not in self.config.cfg:
+                    self.config.cfg[k] = v
 
-    d = dict(cls.__dict__)
-    d.update(Module.__dict__)
-    d.update(dict(
-        __init__=new_init,
-        add_arguments=add_arguments))
+            # get args from config
+            for k in self.config.cfg:
+                if k in allowed_args:
+                    cfg[k] = self.config.cfg[k]
 
-    if 'submodules' not in cls.__dict__:
-        d['submodules'] = submodules
-    else:
-        d['submodules'] = cls.submodules
+        if varkw is None:
+            orig_init(self, **cfg)
+        else:
+            cfg.update(kwargs)
+            orig_init(self, **cfg)
 
-    new_cls = type(cls.__name__, (cls.__base__,), d)
+    # inherit Module methods
+    for k, v in Module.__dict__.items():
+        if k != '__dict__' and k not in cls.__dict__:
+            setattr(cls, k, v)
+    setattr(cls, '__init__', new_init)
+    setattr(cls, 'add_arguments', add_arguments)
+
     if not cls.__name__.startswith('_'):
-        register_module(new_cls)
-    return new_cls
+        register_module(cls)
+    return cls
 
 
 def command(f):
@@ -548,7 +567,9 @@ def workspace(path):
 
 
 class _config:
-    def __init__(self, cfg):
+    def __init__(self, cfg=None):
+        if cfg is None:
+            cfg = {}
         self.cfg = cfg
 
     def __setstate__(self, state):
