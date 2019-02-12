@@ -12,7 +12,7 @@ from operator import itemgetter
 
 import toml
 
-from . import util
+from .util import classproperty
 
 
 class NotConfiguredError(Exception):
@@ -234,6 +234,11 @@ class Workspace:
         return 'Workspace(path=' + str(self.path) + ')'
 
 
+class Run:
+    def __init__(self, tag, resume):
+        pass
+
+
 class Module:
     """Interface for configurable modules.
 
@@ -253,7 +258,7 @@ class Module:
     def ws(self, ws):
         self._ws = ws
 
-    @util.classproperty
+    @classproperty
     def help(cls):
         return 'module ' + cls.__name__
 
@@ -303,7 +308,7 @@ class Module:
 class Command(abc.ABC):
     """Command interface."""
 
-    @util.classproperty
+    @classproperty
     def help(cls):
         return 'command ' + cls.__name__.lower()
 
@@ -608,3 +613,6 @@ class _config:
 
 
 config = _config(app)
+
+
+# __all__ = []

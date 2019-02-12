@@ -6,9 +6,21 @@ Framework for Reproducible ExperimenTs
 
 ## API
 
-```python
-import fret
+### Basic Usage
 
+### Workspace, Run and Module
+```python
+@fret.command
+def resumable(ws):
+    with ws.run() as run:
+        i = run.acc()
+        run.register(stateful)
+        for e in fret.critical(run.range(10)):
+            pass
+```
+
+### Inheritance
+```python
 @fret.configurable
 class A:
     def __init__(self, foo='bar'):
@@ -19,9 +31,16 @@ class B(A):
     def __init__(self, bar=3, **others):
         super().__init__(**others)
         ...
-        
+
+ws = fret.workspace('/tmp/ws')
 b = B(foo=0, bar=0, sth=3)
 print(b.config)
+```
+
+### Internals
+```python
+config = fret.Configuration({'foo': 'bar'})
+fret.app
 ```
 
 ## TODO

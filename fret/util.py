@@ -1,3 +1,54 @@
+from collections import OrderedDict
+
+import toml
+
+
+class Configuration:
+    """Easy to construct, use and read configuration class."""
+    def __init__(self, *args, **kwargs):
+        self._config = OrderedDict(*args, **kwargs)
+
+    def _keys(self):
+        return self._config.keys()
+
+    def _values(self):
+        return self._config.values()
+
+    def _items(self):
+        return self._config.items()
+
+    def _get(self, key):
+        return self._config.get(key)
+
+    def __getitem__(self, key):
+        return self._config[key]
+
+    def __getattr__(self, key):
+        v = self._config[key]
+        if isinstance(v, dict):
+            return Configuration(v)
+        else:
+            return v
+
+    def __iter__(self):
+        return iter(self._config)
+
+    def __len__(self):
+        return len(self._config)
+
+    def __str__(self):
+        return str(self._config)
+
+    def __repr__(self):
+        return str(self._config)
+
+    def _toml(self):
+        return toml.dumps(self._config)
+
+    def _dict(self):
+        return self._config
+
+
 class classproperty(object):
     def __init__(self, f):
         self.f = f
