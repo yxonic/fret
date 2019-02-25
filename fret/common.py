@@ -3,6 +3,7 @@ import inspect as ins
 import logging
 import pathlib
 import pickle
+from datetime import datetime
 
 import toml
 
@@ -150,6 +151,65 @@ class Workspace:
 
     def __repr__(self):
         return 'Workspace(path=' + str(self.path) + ')'
+
+
+class Run:
+    def __init__(self, ws, tag, resume):
+        self._ws = ws
+        self._tag = tag
+        self._id = datetime.now().strftime("%Y%m%d%H%M%S")
+        if resume:
+            files = [filename for filename in
+                     ws.path.joinpath('checkpoint').iterdir()
+                     if filename.is_dir() and filename.name.startswith(tag)]
+            if files:
+                self._id = max(files)  # most recent
+
+    def __enter__(self):
+        # load state if possible
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # save state
+        return
+
+    @optional(None)
+    def value(self, name, value):
+        pass
+
+    @optional(None)
+    def register(self, name, obj):
+        pass
+
+    @optional(None)
+    def acc(self, name, initial):
+        pass
+
+    @optional(None)
+    def range(self, name, default):
+        pass
+
+    @staticmethod
+    def _touch_dir(p, is_dir=False):
+        if is_dir:
+            p.mkdir(parents=True, exist_ok=True)
+        else:
+            p.parent.mkdir(parents=True, exist_ok=True)
+
+    def log(self, filename):
+        path = self._ws.path.joinpath('log', self._id, filename)
+        self._touch_dir(path, filename.endswith('/'))
+        return path
+
+    def result(self, filename):
+        path = self._ws.path.joinpath('result', self._id, filename)
+        self._touch_dir(path, filename.endswith('/'))
+        return path
+
+    def checkpoint(self, filename):
+        path = self._ws.path.joinpath('checkpoint', self._id, filename)
+        self._touch_dir(path, filename.endswith('/'))
+        return path
 
 
 class Builder:

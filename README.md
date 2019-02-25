@@ -15,7 +15,7 @@ def resumable(ws):
     with ws.run() as run:
         i = run.acc()
         run.register(stateful)
-        for e in fret.critical(run.range(10)):
+        for e in fret.nonbreak(run.range(10)):
             pass
 ```
 
@@ -40,20 +40,18 @@ print(b.config)
 ### Internals
 ```python
 config = fret.Configuration({'foo': 'bar'})
-fret.app
 ```
 
 ## TODO
 - [x] `fret.Configuration`: high-level class for configuration
-- [ ] `fret.Workspace`: module new/save/load (by tag or by path)
+- [x] `fret.Workspace`: module build/save/load (by tag or by path)
 - [ ] `ws.run()` context manager: `run.accumulator()`, `run.range()`, `run.register()`
 - [ ] `@fret.configurable`: remove submodule, add ws parameter, parameter checking
-- [ ] CLI: `fret.App`, entry point logic, testing
-- [ ] Tagged workspace
+- [x] `fret.App`, global app object
+- [ ] CLI: entry point logic, testing, tagged workspace
 - [ ] Parameter check
 - [ ] Java/GNU style command line args, shorthands, better logic for boolean default value
 - [ ] Global configuration file: `fret.toml`
-- [ ] `fret` global app object (singleton)
 - [ ] Documents and examples
-- [ ] `fret new` command
+- [ ] `fret new` command with interactive CLI
 - [ ] Other fret commands like show log, check module, etc.

@@ -78,3 +78,7 @@ def test_workspace(tmpdir: py.path.local):
     ws_ = fret.workspace(str(tmpdir.join('ws')))
     main_ = ws_.build(c=3)
     assert main_.b.config.b == 4
+
+    # persistency: ws.run context manager
+    with ws.run('test') as run:
+        pass
