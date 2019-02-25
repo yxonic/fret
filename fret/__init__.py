@@ -1,6 +1,7 @@
-from .common import *
+from .util import colored
+from .app import *
 
-get_app()
+import logging
 
 _logger = logging.getLogger()
 _logger.setLevel(logging.INFO)
@@ -18,7 +19,7 @@ class _ColoredFormatter(logging.Formatter):
     def format(self, record):
         levelname = record.levelname
         if levelname in self._LOG_COLORS:
-            record.levelname = util.colored(
+            record.levelname = colored(
                 record.levelname[0],
                 self._LOG_COLORS[record.levelname],
                 style='b'
@@ -35,5 +36,4 @@ console_handler.setFormatter(log_formatter)
 _logger.addHandler(console_handler)
 
 
-__all__ = ['Workspace', 'Command', 'Module', 'configurable', 'command',
-           'NotConfiguredError', 'ParseError', 'app']
+__all__ = ['app', 'workspace', 'configurable', 'command', 'arg']

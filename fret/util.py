@@ -1,9 +1,14 @@
+import functools
+import inspect
+import re
 from collections import OrderedDict
 
 import toml
 
 
 class Configuration:
+    __slots__ = '_config'
+
     """Easy to construct, use and read configuration class."""
     def __init__(self, *args, **kwargs):
         self._config = OrderedDict(*args, **kwargs)
@@ -30,6 +35,12 @@ class Configuration:
         else:
             return v
 
+    def __contains__(self, key):
+        return key in self._config
+
+    def __eq__(self, other):
+        return dict(self._config) == dict(other._config)
+
     def __iter__(self):
         return iter(self._config)
 
@@ -42,19 +53,18 @@ class Configuration:
     def __repr__(self):
         return str(self._config)
 
-    def _toml(self):
-        return toml.dumps(self._config)
-
     def _dict(self):
         return self._config
 
 
 class classproperty(object):
+    __slots__ = '_f'
+
     def __init__(self, f):
-        self.f = f
+        self._f = f
 
     def __get__(self, obj, owner):
-        return self.f(owner)
+        return self._f(owner)
 
 
 def colored(fmt, fg=None, bg=None, style=None):
@@ -127,3 +137,31 @@ def colored(fmt, fg=None, bg=None, style=None):
         return '\x1b[%sm%s\x1b[0m' % (props, fmt)
     else:
         return fmt
+
+
+_first_cap_re = re.compile('(.)([A-Z][a-z]+)')
+_all_cap_re = re.compile('([a-z0-9])([A-Z])')
+
+
+def to_snake(name):
+    s1 = _first_cap_re.sub(r'\1_\2', name)
+    return _all_cap_re.sub(r'\1_\2', s1).lower()
+
+
+def to_camel(name):
+    return ''.join(x[0].upper() + x[1:] for x in name.split('_'))
+
+
+def optional(default, position=1):
+    def wrapper(f):
+        spec = inspect.getfullargspec(f)
+        expected_len = len(spec.args)
+
+        @functools.wraps(f)
+        def new_f(*args, **kwargs):
+            if len(args) == expected_len - 1:
+                args = args[:position] + (default,) + args[position:]
+            return f(*args, **kwargs)
+
+        return new_f
+    return wrapper

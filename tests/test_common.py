@@ -7,61 +7,74 @@ import fret
 
 
 @fret.configurable
-class ModuleTest:
-    def __init__(self, x=(('required', True), ('type', int)), y=4):
+class A:
+    def __init__(self, a):
         pass
 
 
 @fret.configurable
-class SubModuleTest:
-    def __init__(self, sub, z=5):
+class B:
+    def __init__(self, b):
         pass
 
 
+@fret.configurable(submodules=['sub'])
+class C:
+    def __init__(self, sub, c):
+        self.b = sub()
+
+
 def test_module():
-    model1 = ModuleTest.parse(['-x', '10'])
-    model2 = ModuleTest(x=10, y=4)
-    assert model1.config == model2.config
-
-    with pytest.raises(fret.ParseError) as e:
-        ModuleTest.parse([])
-
-    assert str(e.value) == 'the following arguments are required: -x'
+    pass
 
 
 def test_workspace(tmpdir: py.path.local):
-    ws = fret.Workspace(str(tmpdir.join('ws')))
+    ws = fret.workspace(str(tmpdir.join('ws')))
+    assert ws.path.is_dir()
     assert os.path.samefile(str(ws.path), str(tmpdir.join('ws')))
-    assert os.path.samefile(str(ws.log_path), str(tmpdir.join('ws/log')))
-    assert os.path.samefile(str(ws.result_path),
-                            str(tmpdir.join('ws/result')))
-    assert os.path.samefile(str(ws.checkpoint_path),
-                            str(tmpdir.join('ws/checkpoint')))
 
-    # test logging utilities
-    logger = ws.logger('test')
-    logger.error('test log')
-    assert (ws.log_path / 'test.log').exists()
+    # test file utilities
+    directory = ws.log('test/')
+    assert directory.is_dir()
+    assert os.path.samefile(str(directory), str(tmpdir.join('ws/log/test/')))
 
-    logger = ws.logger('test')
-    logger.error('test log 2')
-    assert len(list((ws.log_path / 'test.log').open())) == 2
+    file = ws.result('test/test.txt')
+    file.open('w').close()
+    assert os.path.samefile(str(file),
+                            str(tmpdir.join('ws/result/test/test.txt')))
+    assert file.exists()
 
-    ws.add_module('main', 'ModuleTest', dict(x=3, y=4))
-    module = ws.build_module()
-    assert module.config._asdict() == dict(x=3, y=4)
+    with pytest.raises(FileNotFoundError):
+        ws.checkpoint('duck.pt').open()
+    ws.checkpoint('duck.pt').open('w').close()
+    assert os.path.samefile(str(ws.checkpoint('duck.pt')),
+                            str(tmpdir.join('ws/checkpoint/duck.pt')))
 
-    ws.save()
-    ws2 = fret.Workspace(str(tmpdir.join('ws')))
-    print(fret.common.app)
-    assert ws.get_module('main') == ws2.get_module('main')
+    # test module registering
+    ws.register(A(a=1))
 
-    with pytest.raises(fret.NotConfiguredError) as e:
-        ws.build_module('wrong')
-    assert str(e.value) == 'module wrong not configured'
+    ws.register('sub', B, b=2)
+    ws.register(C)
 
-    ws.add_module('test', SubModuleTest.parse([]))
-    ws.add_module('sub', 'ModuleTest', dict(x=3, y=4))
+    with pytest.raises(TypeError):
+        ws.build()
 
-    assert str(ws.build_module('test')) == \
-        'SubModuleTest(sub=ModuleTest(x=3, y=4), z=5)'
+    # reproducibility and persistency
+    # rules:
+    # 1. same ws configuration -> same build behavior
+    # 2. submodule and builder relies on current workspace configuration
+    # 3. save and load: ws configuration + build spec + state
+    main = ws.build(c=3)  # env: a=1, b=2; build spec: c=3
+    ws.save(main, 'tag1')
+
+    ws.register('sub', B, b=4)
+    ws.save(main, 'tag2')
+
+    main_ = ws.load('tag1')
+    assert main_.b.config == main.b.config
+    main_ = ws.load('tag2')
+    assert main_.b.config.b == 4
+
+    ws_ = fret.workspace(str(tmpdir.join('ws')))
+    main_ = ws_.build(c=3)
+    assert main_.b.config.b == 4

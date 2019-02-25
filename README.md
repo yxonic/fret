@@ -44,13 +44,12 @@ fret.app
 ```
 
 ## TODO
-- [ ] `fret.Configuration`: high-level class for configuration
+- [x] `fret.Configuration`: high-level class for configuration
 - [ ] `fret.Workspace`: module new/save/load (by tag or by path)
-- [ ] `ws.run()` context manager: `run.accumulator()`, `run.range()`, `run
-.register()`
-- [ ] `@fret.configurable`: remove submodule, add ws parameter, parameter 
-checking
+- [ ] `ws.run()` context manager: `run.accumulator()`, `run.range()`, `run.register()`
+- [ ] `@fret.configurable`: remove submodule, add ws parameter, parameter checking
 - [ ] CLI: `fret.App`, entry point logic, testing
+- [ ] Tagged workspace
 - [ ] Parameter check
 - [ ] Java/GNU style command line args, shorthands, better logic for boolean default value
 - [ ] Global configuration file: `fret.toml`

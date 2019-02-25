@@ -1,96 +1,13 @@
-import abc
 import argparse
-import functools
-import importlib
 import inspect as ins
 import logging
-import os
 import pathlib
-import sys
-from collections import namedtuple, defaultdict
-from operator import itemgetter
+import pickle
 
 import toml
 
-from .util import classproperty
-
-
-class NotConfiguredError(Exception):
-    pass
-
-
-class ParseError(Exception):
-    pass
-
-
-class NoWorkspaceError(Exception):
-    pass
-
-
-app = defaultdict(dict)
-
-
-def get_app(path='.'):
-    p = pathlib.Path(path).absolute()
-    while p != pathlib.Path(p.root):
-        if (p / 'fret.toml').exists():
-            break
-        p = p.parent
-    sys.path.append(str(p))
-    app['path'] = str(p)
-
-    try:
-        config = toml.load((p / 'fret.toml').open())
-    except FileNotFoundError:
-        return
-
-    app.update(config)
-
-    m = importlib.import_module(config['appname'])
-    for m in ins.getmembers(m, _sub_class_checker(Command)):
-        register_command(m[1], m[0].lower())
-    for m in ins.getmembers(m, _sub_class_checker(Module)):
-        register_module(m[1], m[0])
-
-    try:
-        mc = importlib.import_module(config['appname'] + '.command')
-        for m in ins.getmembers(mc, _sub_class_checker(Command)):
-            register_command(m[1], m[0].lower())
-    except ImportError as e:
-        if (config['appname'] + '.command') in str(e):
-            pass
-        else:
-            raise
-
-    try:
-        mm = importlib.import_module(config['appname'] + '.module')
-        for m in ins.getmembers(mm, _sub_class_checker(Module)):
-            register_module(m[1], m[0])
-    except ImportError:
-        pass
-
-    try:
-        _ = importlib.import_module(config['appname'] + '.plugin')
-    except ImportError:
-        pass
-
-
-def register_command(cls, name=None):
-    if name is None:
-        name = cls.__name__.lower()
-    app['commands'][name] = cls
-
-
-def register_module(cls, name=None):
-    if name is None:
-        name = cls.__name__
-    app['modules'][name] = cls
-
-
-def register_ws_mixin(cls, name=None):
-    if name is None:
-        name = cls.__name__.lower()
-    app['ws_mixins'][name] = cls
+from .exceptions import NotConfiguredError, NoWorkspaceError, ParseError
+from .util import classproperty, Configuration, optional
 
 
 class Workspace:
@@ -98,41 +15,18 @@ class Workspace:
     with specific configuration, save checkpoints, open results, etc., using
     workspace objects."""
 
-    def __init__(self, path):
-        if not path:
-            if str(os.getcwd()) == app['path']:
-                path = 'ws/test'
-            else:
-                path = '.'
-
-        if 'path' in app:
-            # record relative path to
-            path = os.path.relpath(path, app['path'])
-            os.chdir(app['path'])
-
+    def __init__(self, app, path, config=None):
+        self._app = app
         self._path = pathlib.Path(path)
-        self._log_path = self._path / 'log'
-        self._checkpoint_path = self._path / 'checkpoint'
-        self._result_path = self._path / 'result'
-        self._config_path = self._path / 'config.toml'
-        self._modules = None
-
-    def load(self):
-        """Load configuration."""
         self._modules = {}
-        config = toml.load(self.config_path.open())
-        for name, cfg in config.items():
-            cls_name = cfg['module']
-            del cfg['module']
-            self.add_module(name, cls_name, cfg)
-
-    def save(self):
-        """Save configuration."""
-        f = self.config_path.open('w')
-        cfg = {name: dict({'module': cls_name}, **cfg)
-               for name, (cls_name, cfg) in self._modules.items()}
-        toml.dump(cfg, f)
-        f.close()
+        if self.config_path.exists():
+            conf = toml.load(self.config_path.open())
+            for name, cfg in conf.items():
+                cls_name = cfg['module']
+                del cfg['module']
+                self._modules[name] = (cls_name, cfg)
+        if config:
+            self._modules.update(config)
 
     @property
     def path(self):
@@ -141,66 +35,90 @@ class Workspace:
         return self._path
 
     @property
-    def result_path(self):
-        if not self._result_path.exists():
-            self._result_path.mkdir(parents=True)
-        return self._result_path
-
-    @property
-    def checkpoint_path(self):
-        if not self._checkpoint_path.exists():
-            self._checkpoint_path.mkdir(parents=True)
-        return self._checkpoint_path
-
-    @property
-    def log_path(self):
-        if not self._log_path.exists():
-            self._log_path.mkdir(parents=True)
-        return self._log_path
-
-    @property
     def config_path(self):
-        if not self._config_path.exists():
-            _ = self.path
-            self._config_path.open('w').close()
-        return self._config_path
+        cp = self.path.joinpath('config.toml')
+        return cp
 
-    def add_module(self, name, module, config=None):
-        if self._modules is None:
-            self.load()
-        if config is None:
-            self._modules[name] = (module.__class__.__name__,
-                                   module.config._asdict())
+    @staticmethod
+    def _touch_dir(p, is_dir=False):
+        if is_dir:
+            p.mkdir(parents=True, exist_ok=True)
         else:
-            self._modules[name] = (module, config)
+            p.parent.mkdir(parents=True, exist_ok=True)
 
-    def get_module(self, name='main'):
-        if self._modules is None:
-            self.load()
+    def log(self, filename):
+        path = self.path.joinpath('log', filename)
+        self._touch_dir(path, filename.endswith('/'))
+        return path
+
+    def result(self, filename):
+        path = self.path.joinpath('result', filename)
+        self._touch_dir(path, filename.endswith('/'))
+        return path
+
+    def checkpoint(self, filename):
+        path = self.path.joinpath('checkpoint', filename)
+        self._touch_dir(path, filename.endswith('/'))
+        return path
+
+    @optional('main')
+    def register(self, name, module, **kwargs):
+        """Register and save module configuration."""
+        if not ins.isclass(module):
+            cfg = module.config._dict()
+            cfg.update(kwargs)
+            self._modules[name] = (module.__class__.__name__, cfg)
+        else:
+            self._modules[name] = (module.__name__, kwargs)
+
+        cfg = {name: dict({'module': cls_name}, **cfg)
+               for name, (cls_name, cfg) in self._modules.items()}
+        toml.dump(cfg, self.config_path.open('w'))
+
+    def _get_module(self, name='main'):
         if name in self._modules:
             return self._modules[name]
         else:
             raise NotConfiguredError('module %s not configured' % name)
 
-    def build_module(self, name='main', **kwargs):
+    def build(self, name='main', **kwargs):
         """Build module according to the configurations in current
         workspace."""
-        cls_name, cfg = self.get_module(name)
+        cls_name, cfg = self._get_module(name)
         cfg = cfg.copy()
         cfg.update(kwargs)
 
         try:
-            cls = app['modules'][cls_name]
+            cls = self._app.load_module(cls_name)
         except KeyError:
             raise KeyError('definition of module %s not found', cls_name)
 
         for sub in cls.submodules:
-            if sub in cfg and isinstance(cfg[sub], str):
-                cfg[sub] = _Builder(self, cfg[sub])
+            if sub not in cfg or isinstance(cfg[sub], str):
+                cfg[sub] = Builder(self, cfg.get(sub) or sub)
 
         # noinspection PyCallingNonCallable
         obj = cls(**cfg)
         obj.ws = self
+        if kwargs:
+            obj.spec = Configuration(kwargs)
+        return obj
+
+    @optional('main')
+    def save(self, name, obj, tag):
+        env = self._modules
+        args = obj.spec._dict() if hasattr(obj, 'spec') else {}
+        state = obj.state_dict()
+        pickle.dump({'env': env, 'args': args, 'state': state},
+                    self.checkpoint(name + '.' + tag + '.pt').open('wb'))
+
+    @optional('main')
+    def load(self, name, tag):
+        state = pickle.load(
+            self.checkpoint(name + '.' + tag + '.pt').open('rb'))
+        last_ws = Workspace(self._app, self._path, state['env'])
+        obj = last_ws.build(name, **state['args'])
+        obj.load_state_dict(state['state'])
         return obj
 
     def logger(self, name: str):
@@ -219,7 +137,7 @@ class Workspace:
                                            '%(asctime)s %(message)s',
                                            datefmt='%Y-%m-%d %H:%M:%S')
         file_handler = logging.FileHandler(
-            str(self.log_path / (name + '.log')))
+            str(self.log(name + '.log')))
         file_handler.setFormatter(file_formatter)
         logger.addHandler(file_handler)
         return logger
@@ -234,9 +152,31 @@ class Workspace:
         return 'Workspace(path=' + str(self.path) + ')'
 
 
-class Run:
-    def __init__(self, tag, resume):
-        pass
+class Builder:
+    def __init__(self, ws, name):
+        self.ws = ws
+        self._name = name
+
+    def __eq__(self, other):
+        return self.ws._modules[self._name] == other.ws._modules[other._name]
+
+    def __call__(self, **kwargs):
+        return self.ws.build(self._name, **kwargs)
+
+    def __str__(self):
+        cls_name, cfg = self.ws._modules[self._name]
+        return cls_name + str(cfg)
+
+    def __repr__(self):
+        return str(self)
+
+    def __getattr__(self, item):
+        cls_name, cfg = self.ws.get_module(self._name)[0]
+        try:
+            cls = self.ws.app.load_module(cls_name)
+        except KeyError:
+            raise KeyError('definition of module %s not found', cls_name)
+        return getattr(cls, item)
 
 
 class Module:
@@ -295,324 +235,11 @@ class Module:
         Args:
             config (dict): module configuration
         """
-        self.config = _config(kwargs)
+        self.config = Configuration(kwargs)
         self._ws = None
 
     def __str__(self):
-        return _pretty_str(self.__class__.__name__, self.config._asdict())
+        return self.__class__.__name__ + str(self.config)
 
     def __repr__(self):
         return str(self)
-
-
-class Command(abc.ABC):
-    """Command interface."""
-
-    @classproperty
-    def help(cls):
-        return 'command ' + cls.__name__.lower()
-
-    def __init__(self, parser):
-        self.parser = parser
-
-    def _run(self, args):
-        ws = Workspace(args.workspace)
-        cmd = args.command
-        del args.command, args.func, args.workspace
-        args = {name: value for (name, value) in args._get_kwargs()}
-        args = namedtuple(cmd, args.keys())(*args.values())
-        return self.run(ws, args)
-
-    @abc.abstractmethod
-    def run(self, ws, args):
-        raise NotImplementedError
-
-
-def configurable(cls):
-    orig_init = cls.__init__
-    positional, config, varkw = _get_args(orig_init)
-    submodules = [s for s in positional[1:] if not s.startswith('_')]
-    if 'submodules' not in cls.__dict__:
-        setattr(cls, 'submodules', submodules)
-
-    @classmethod
-    def add_arguments(_, parser):
-        _add_arguments_by_kwargs(parser, config)
-
-    def new_init(self, *args, **kwargs):
-        # get config from signature
-        allowed_args = set(positional[1:]) | set(x[0] for x in config)
-        cfg = ins.getcallargs(orig_init, self, *args,
-                              **{k: v for k, v in kwargs.items()
-                                 if k in allowed_args})
-        del cfg['self']
-
-        defaults = {k: v for k, v in config}
-        for k in defaults:
-            v = cfg[k]
-            if v != defaults[k]:
-                continue
-            if isinstance(v, tuple):
-                if isinstance(v[0], tuple):
-                    cfg[k] = {k_: v_ for k_, v_ in v}.get('default')
-                else:
-                    cfg[k] = v[0]
-
-        if not hasattr(self, 'config'):
-            _cfg = cfg.copy()
-            _cfg.update(kwargs)
-            Module.__init__(self, **_cfg)
-        else:
-            # update config with function default values
-            for k, v in cfg.items():
-                if k not in self.config.cfg:
-                    self.config.cfg[k] = v
-
-            # get args from config
-            for k in self.config.cfg:
-                if k in allowed_args:
-                    cfg[k] = self.config.cfg[k]
-
-        if varkw is None:
-            orig_init(self, **cfg)
-        else:
-            cfg.update(kwargs)
-            orig_init(self, **cfg)
-
-    # inherit Module methods
-    for k, v in Module.__dict__.items():
-        if k != '__dict__' and k not in cls.__dict__:
-            setattr(cls, k, v)
-    setattr(cls, '__init__', new_init)
-    setattr(cls, 'add_arguments', add_arguments)
-
-    if not cls.__name__.startswith('_'):
-        register_module(cls)
-    return cls
-
-
-def command(f):
-    _args, config, _ = _get_args(f)
-
-    @functools.wraps(f)
-    def new_f(*args, **kwargs):
-        cfg = {}
-        for k, v in config:
-            if isinstance(v, tuple):
-                cfg[k] = v[0]
-            elif isinstance(v, arg):
-                cfg[k] = v.kwargs.get('default')
-            else:
-                cfg[k] = v
-        cfg.update(kwargs)
-        f_args = {k: v for k, v in zip(_args[1:], args[1:])}
-        f_args.update(cfg)
-        # TODO: make an util class for this
-        new_f.args = namedtuple(f.__name__, f_args.keys())(*f_args.values())
-        return f(*args, **cfg)
-
-    class Cmd(Command):
-        def __init__(self, parser):
-            super().__init__(parser)
-            for arg in _args[1:]:
-                parser.add_argument('-' + arg)
-            _add_arguments_by_kwargs(parser, config)
-
-        def run(self, ws, args):
-            return new_f(ws, **args._asdict())
-
-    Cmd.__name__ = f.__name__[0].upper() + f.__name__[1:]
-    register_command(Cmd)
-
-    return new_f
-
-
-def _get_args(f):
-    spec = ins.getfullargspec(f)
-    n_config = len(spec.defaults) if spec.defaults else 0
-    args = spec.args if n_config == 0 else spec.args[:-n_config]
-    kwargs = [] if n_config == 0 else \
-        [(k, v) for k, v in zip(spec.args[-n_config:], spec.defaults)]
-    return args, kwargs, spec.varkw
-
-
-def _add_arguments_by_kwargs(parser, config):
-    abbrs = set()
-    for k, v in config:
-        # TODO: add arg style (java/gnu), better logic
-        if isinstance(k, str) and k.startswith('_'):
-            continue
-
-        if '_' in k:
-            parts = k.split('_')
-            abbr = ''.join(p[:1] for p in parts)
-        elif len(k) > 1:
-            i = 1
-            while k[:i] in abbrs and i < len(k):
-                i += 1
-            abbr = k[:i]
-        else:
-            abbr = None
-
-        if abbr is not None and abbr not in abbrs:
-            abbrs.add(abbr)
-            args = ['-' + k, '-' + abbr]
-        else:
-            args = ['-' + k]
-
-        if isinstance(v, arg):
-            if v.args:
-                parser.add_argument(*v.args, **v.kwargs)
-            else:
-                parser.add_argument(*args, **v.kwargs)
-            continue
-
-        if isinstance(v, tuple):
-            if len(v) > 0 and isinstance(v[0], tuple):
-                # kwargs for parser.add_argument
-                v = {x: y for x, y in v}
-            else:
-                # just default value and help
-                if isinstance(v[0], bool):
-                    if v[0]:
-                        nv = {
-                            'action': 'store_false',
-                            'help': v[1],
-                            'dest': k
-
-                        }
-                        args[0] = '-no' + k
-                    else:
-                        nv = {
-                            'action': 'store_true',
-                            'help': v[1]
-                        }
-                elif isinstance(v[0], list):
-                    nv = {
-                        'default': v[0],
-                        'help': v[1],
-                        'nargs': '+' if v[0] else '*',
-                        'type': type(v[0][0]) if v[0] else str
-                    }
-                else:
-                    nv = {
-                        'default': v[0],
-                        'type': type(v[0]),
-                        'help': v[1]
-                    } if v[0] is not None else {
-                        'help': v[1]
-                    }
-                if len(v) > 2:
-                    nv['choices'] = v[2]
-                v = nv
-            parser.add_argument(*args, **v)
-        elif isinstance(v, bool):
-            if v:
-                args[0] = '-no' + k
-                parser.add_argument(*args, action='store_false',
-                                    help='argument %s' % k, dest=k)
-            else:
-                parser.add_argument(*args, action='store_true',
-                                    help='argument %s' % k)
-        elif v is None:
-            parser.add_argument(*args, help='argument %s' % k)
-        else:
-            parser.add_argument(*args, default=v, type=type(v),
-                                help='argument %s' % k)
-
-
-def _sub_class_checker(cls):
-    def rv(obj):
-        return ins.isclass(obj) and \
-            not obj.__name__.startswith('_') and \
-            issubclass(obj, cls)
-
-    return rv
-
-
-class _Builder:
-    def __init__(self, ws, name):
-        self.ws = ws
-        self._name = name
-
-    def __call__(self, **kwargs):
-        return self.ws.build_module(self._name, **kwargs)
-
-    def __str__(self):
-        return _pretty_str(*self.ws.get_module(self._name))
-
-    def __repr__(self):
-        return str(self)
-
-    def __getattr__(self, item):
-        cls_name = self.ws.get_module(self._name)[0]
-        try:
-            cls = app['modules'][cls_name]
-        except KeyError:
-            raise KeyError('definition of module %s not found', cls_name)
-        return getattr(cls, item)
-
-
-def _pretty_str(cls_name, cfg):
-    return cls_name + '(' + \
-        ', '.join([str(k) + '=' + str(v) for k, v in
-                   sorted(list(cfg.items()),
-                          key=itemgetter(0))
-                   if not k.startswith('_')]) + ')'
-
-
-class arg:
-    def __init__(self, *args, **kwargs):
-        self.args = args
-        self.kwargs = kwargs
-
-
-def workspace(path):
-    return Workspace(path)
-
-
-class _config:
-    def __init__(self, cfg=None):
-        if cfg is None:
-            cfg = {}
-        self.cfg = cfg
-
-    def __setstate__(self, state):
-        self.cfg = state
-
-    def __getstate__(self):
-        return self.cfg
-
-    def __getattr__(self, item):
-        v = self.cfg.get(item)
-        if isinstance(v, dict):
-            return _config(v)
-        else:
-            return v
-
-    def __getitem__(self, item):
-        return self.cfg[item]
-
-    def __setitem__(self, key, value):
-        self.cfg[key] = value
-
-    def get(self, item):
-        return self.cfg.get(item)
-
-    def _asdict(self):
-        return self.cfg
-
-    def __str__(self):
-        return ', '.join([str(k) + '=' + str(v) for k, v in
-                          sorted(list(self.cfg.items()),
-                                 key=itemgetter(0))
-                          if not k.startswith('_')])
-
-    def __eq__(self, other):
-        return self.cfg == other.cfg
-
-
-config = _config(app)
-
-
-# __all__ = []

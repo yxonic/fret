@@ -6,6 +6,7 @@ import sys
 
 from . import common
 from . import util
+from .app import Command
 
 
 class _ArgumentParser(argparse.ArgumentParser):
@@ -22,7 +23,7 @@ main_parser = _ArgumentParser(
 subparsers = {}
 
 
-class Config(common.Command):
+class Config(Command):
     """Command ``config``,
 
     Configure a module and its parameters for a workspace.
@@ -37,7 +38,6 @@ class Config(common.Command):
     help = 'configure module for workspace'
 
     def __init__(self, parser):
-        super().__init__(parser)
         parser.add_argument('name', default='main', nargs='?',
                             help='module name')
         subs = parser.add_subparsers(title='modules available', dest='module')
@@ -75,13 +75,10 @@ class Config(common.Command):
         if config:
             print(config)
         else:
-            print(util.colored('warning:', 'y', style='b'),
-                  'no configuration found. please run `fret config <module>`',
-                  file=sys.stderr)
-            self.parser.print_usage()
+            raise common.NotConfiguredError
 
 
-class Clean(common.Command):
+class Clean(Command):
     """Command ``clean``.
 
     Remove all checkpoints in specific workspace. If ``--all`` is specified,
@@ -91,7 +88,6 @@ class Clean(common.Command):
     help = 'clean workspace'
 
     def __init__(self, parser):
-        super().__init__(parser)
         parser.add_argument('--all', action='store_true',
                             help='clean the entire workspace')
         parser.add_argument('-c', dest='config', action='store_true',
