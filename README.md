@@ -8,7 +8,9 @@ Framework for Reproducible ExperimenTs
 
 ### Basic Usage
 
-### Workspace, Run and Module
+### Building CLI
+
+### An Advanced Workflow
 ```python
 @fret.command
 def resumable(ws):
@@ -19,11 +21,30 @@ def resumable(ws):
             pass
 ```
 
-### Inheritance
+### Submodule
 ```python
 @fret.configurable
 class A:
     def __init__(self, foo='bar'):
+        ...
+
+@fret.configurable(submodules=['a'])
+class B:
+    def __init__(self, a, bar=3):
+        ...
+
+>>> ws = fret.workspace('/tmp/ws')
+>>> a = A()
+>>> b = B(a, bar=4)
+>>> b
+B(A(foo='bar'), bar=4)
+```
+
+### Inheritance
+```python
+@fret.configurable
+class A:
+    def __init__(self, foo='bar', sth=3):
         ...
 
 @fret.configurable
@@ -32,21 +53,24 @@ class B(A):
         super().__init__(**others)
         ...
 
-ws = fret.workspace('/tmp/ws')
-b = B(foo=0, bar=0, sth=3)
-print(b.config)
+>>> ws = fret.workspace('/tmp/ws')
+>>> b = B(foo=0, bar=0)
+>>> b
+B(foo=0, bar=0, sth=3)
 ```
 
 ### Internals
 ```python
-config = fret.Configuration({'foo': 'bar'})
+>>> config = fret.Configuration({'foo': 'bar'})
+>>> config
+foo='bar'
 ```
 
 ## TODO
 - [x] `fret.Configuration`: high-level class for configuration
 - [x] `fret.Workspace`: module build/save/load (by tag or by path)
-- [ ] `ws.run()` context manager: `run.accumulator()`, `run.range()`, `run.register()`
-- [ ] `@fret.configurable`: remove submodule, add ws parameter, parameter checking
+- [ ] `ws.run()` context manager, `run.value()`, `run.acc()`, `run.range()`, `run.register()`
+- [ ] `@fret.configurable`: add ws parameter, parameter checking
 - [x] `fret.App`, global app object
 - [ ] CLI: entry point logic, testing, tagged workspace
 - [ ] Parameter check
