@@ -8,7 +8,47 @@ Framework for Reproducible ExperimenTs
 
 ### Basic Usage
 
-### Building CLI
+Create a file named `app.py` with content:
+```python
+@fret.configurable
+class Model:
+    def __init__(self, x=3, y=4):
+        ...
+        
+@fret.command
+def run(ws):
+    model = ws.build()
+    print(model)
+```
+
+Then under the same directory, you can run: 
+```sh
+$ fret config Model
+$ fret run
+Model(x=3, y=4)
+$ fret config Model -x 5 -y 10
+$ fret run
+Model(x=5, y=10)
+```
+
+### Using Workspace
+
+You can specify different configuration in different workspace:
+```sh
+$ fret -w ws/model1 config Model
+$ fret -w ws/model2 config Model -x 5 -y 10
+$ fret -w ws/model1 run
+Model(x=3, y=4)
+$ fret -w ws/model2 run
+Model(x=5, y=10)
+```
+
+You can ommit `-w <path>` if you are currently under a workspace:
+```sh
+$ cd ws/model2
+$ fret run
+Model(x=5, y=10)
+```
 
 ### An Advanced Workflow
 ```python
@@ -33,7 +73,6 @@ class B:
     def __init__(self, a, bar=3):
         ...
 
->>> ws = fret.workspace('/tmp/ws')
 >>> a = A()
 >>> b = B(a, bar=4)
 >>> b
@@ -53,7 +92,6 @@ class B(A):
         super().__init__(**others)
         ...
 
->>> ws = fret.workspace('/tmp/ws')
 >>> b = B(foo=0, bar=0)
 >>> b
 B(foo=0, bar=0, sth=3)

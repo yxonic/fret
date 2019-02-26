@@ -74,7 +74,7 @@ class App:
     def workspace(self, path=None):
         if path is None:
             path = pathlib.Path(self._cwd).relative_to(self._root) if \
-                self._cwd is not None else 'ws/test'
+                self._cwd is not None else 'ws/_default'
         return Workspace(self, path)
 
     def __getattr__(self, key):
