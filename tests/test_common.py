@@ -6,18 +6,21 @@ import pytest
 import fret
 
 
+# noinspection PyUnusedLocal
 @fret.configurable
 class A:
     def __init__(self, a):
         pass
 
 
+# noinspection PyUnusedLocal
 @fret.configurable
 class B:
     def __init__(self, b):
         pass
 
 
+# noinspection PyUnusedLocal
 @fret.configurable(submodules=['sub'])
 class C:
     def __init__(self, sub, c):
@@ -81,4 +84,16 @@ def test_workspace(tmpdir: py.path.local):
 
     # persistency: ws.run context manager
     with ws.run('test') as run:
-        pass
+        rid = run.id
+        assert rid.startswith('test')
+        assert run.checkpoint().is_dir()
+
+    with ws.run('test') as run:
+        assert run.id == rid
+
+    with ws.run('test', resume=False) as run:
+        assert run.id != rid
+        rid = run.id
+
+    with ws.run('test') as run:
+        assert run.id == rid

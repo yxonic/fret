@@ -41,25 +41,25 @@ class Workspace:
         return cp
 
     @staticmethod
-    def _touch_dir(p, is_dir=False):
+    def _mkdir(p, is_dir=False):
         if is_dir:
             p.mkdir(parents=True, exist_ok=True)
         else:
             p.parent.mkdir(parents=True, exist_ok=True)
 
-    def log(self, filename):
+    def log(self, filename='.'):
         path = self.path.joinpath('log', filename)
-        self._touch_dir(path, filename.endswith('/'))
+        self._mkdir(path, filename.endswith('/') or filename == '.')
         return path
 
-    def result(self, filename):
+    def result(self, filename='.'):
         path = self.path.joinpath('result', filename)
-        self._touch_dir(path, filename.endswith('/'))
+        self._mkdir(path, filename.endswith('/') or filename == '.')
         return path
 
-    def checkpoint(self, filename):
+    def checkpoint(self, filename='.'):
         path = self.path.joinpath('checkpoint', filename)
-        self._touch_dir(path, filename.endswith('/'))
+        self._mkdir(path, filename.endswith('/') or filename == '.')
         return path
 
     @optional('main')
@@ -154,24 +154,36 @@ class Workspace:
 
 
 class Run:
+    __slots__ = ['_ws', '_id', '_states']
+
     def __init__(self, ws, tag, resume):
         self._ws = ws
-        self._tag = tag
-        self._id = datetime.now().strftime("%Y%m%d%H%M%S")
+        self._id = None
+        self._states = []
         if resume:
-            files = [filename for filename in
-                     ws.path.joinpath('checkpoint').iterdir()
-                     if filename.is_dir() and filename.name.startswith(tag)]
-            if files:
-                self._id = max(files)  # most recent
+            ids = [filename.name for filename in ws.checkpoint().iterdir()
+                   if filename.is_dir() and filename.name.startswith(tag)]
+            print([filename.name for filename in ws.checkpoint().iterdir()])
+            if ids:
+                self._id = max(ids)  # most recent
+        if self._id is None:
+            self._id = tag + '-' + datetime.now().strftime("%Y%m%d%H%M%S")
+        if not resume:
+            while ws.checkpoint(self._id).exists():
+                self._id = self._id + '_'
 
     def __enter__(self):
         # load state if possible
+        self._mkdir(self._ws.checkpoint(self._id), True)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         # save state
         return
+
+    @property
+    def id(self):
+        return self._id
 
     @optional(None)
     def value(self, name, value):
@@ -190,25 +202,25 @@ class Run:
         pass
 
     @staticmethod
-    def _touch_dir(p, is_dir=False):
+    def _mkdir(p, is_dir=False):
         if is_dir:
             p.mkdir(parents=True, exist_ok=True)
         else:
             p.parent.mkdir(parents=True, exist_ok=True)
 
-    def log(self, filename):
+    def log(self, filename='.'):
         path = self._ws.path.joinpath('log', self._id, filename)
-        self._touch_dir(path, filename.endswith('/'))
+        self._mkdir(path, filename.endswith('/') or filename == '.')
         return path
 
-    def result(self, filename):
+    def result(self, filename='.'):
         path = self._ws.path.joinpath('result', self._id, filename)
-        self._touch_dir(path, filename.endswith('/'))
+        self._mkdir(path, filename.endswith('/') or filename == '.')
         return path
 
-    def checkpoint(self, filename):
+    def checkpoint(self, filename='.'):
         path = self._ws.path.joinpath('checkpoint', self._id, filename)
-        self._touch_dir(path, filename.endswith('/'))
+        self._mkdir(path, filename.endswith('/') or filename == '.')
         return path
 
 

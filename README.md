@@ -54,9 +54,10 @@ Model(x=5, y=10)
 ```python
 @fret.command
 def resumable(ws):
+    model = ws.build()
     with ws.run() as run:
         i = run.acc()
-        run.register(stateful)
+        run.register(model)
         for e in fret.nonbreak(run.range(10)):
             pass
 ```
