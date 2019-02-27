@@ -3,8 +3,6 @@ import inspect
 import re
 from collections import OrderedDict
 
-import toml
-
 
 class Configuration:
     __slots__ = '_config'
@@ -164,4 +162,19 @@ def optional(default, position=1):
             return f(*args, **kwargs)
 
         return new_f
+    return wrapper
+
+
+def stateful(states):
+    def wrapper(cls):
+        def state_dict(self):
+            return {s: getattr(self, s) for s in states}
+
+        def load_state_dict(self, state):
+            for s in states:
+                setattr(self, s, state[s])
+
+        cls.state_dict = state_dict
+        cls.load_state_dict = load_state_dict
+        return cls
     return wrapper

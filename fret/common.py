@@ -8,7 +8,7 @@ from datetime import datetime
 import toml
 
 from .exceptions import NotConfiguredError, NoWorkspaceError, ParseError
-from .util import classproperty, Configuration, optional
+from .util import classproperty, Configuration, optional, stateful
 
 
 class Workspace:
@@ -47,19 +47,19 @@ class Workspace:
         else:
             p.parent.mkdir(parents=True, exist_ok=True)
 
-    def log(self, filename='.'):
-        path = self.path.joinpath('log', filename)
-        self._mkdir(path, filename.endswith('/') or filename == '.')
+    def log(self, *filename):
+        path = self.path.joinpath('log', *filename)
+        self._mkdir(path, not filename or filename[-1].endswith('/'))
         return path
 
-    def result(self, filename='.'):
-        path = self.path.joinpath('result', filename)
-        self._mkdir(path, filename.endswith('/') or filename == '.')
+    def result(self, *filename):
+        path = self.path.joinpath('result', *filename)
+        self._mkdir(path, not filename or filename[-1].endswith('/'))
         return path
 
-    def checkpoint(self, filename='.'):
-        path = self.path.joinpath('checkpoint', filename)
-        self._mkdir(path, filename.endswith('/') or filename == '.')
+    def checkpoint(self, *filename):
+        path = self.path.joinpath('checkpoint', *filename)
+        self._mkdir(path, not filename or filename[-1].endswith('/'))
         return path
 
     @optional('main')
@@ -154,16 +154,16 @@ class Workspace:
 
 
 class Run:
-    __slots__ = ['_ws', '_id', '_states']
+    __slots__ = ['_ws', '_id', '_states', '_index']
 
     def __init__(self, ws, tag, resume):
         self._ws = ws
         self._id = None
-        self._states = []
+        self._states = {}
+        self._index = 0
         if resume:
             ids = [filename.name for filename in ws.checkpoint().iterdir()
                    if filename.is_dir() and filename.name.startswith(tag)]
-            print([filename.name for filename in ws.checkpoint().iterdir()])
             if ids:
                 self._id = max(ids)  # most recent
         if self._id is None:
@@ -174,12 +174,17 @@ class Run:
 
     def __enter__(self):
         # load state if possible
-        self._mkdir(self._ws.checkpoint(self._id), True)
+        state_file = self._ws.checkpoint(self._id, '.states.pt')
+        if state_file.exists():
+            self._states = pickle.load(state_file.open('rb'))
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        # save state
-        return
+        state_file = self._ws.checkpoint(self._id, '.states.pt')
+        for k in self._states:
+            if hasattr(self._states[k], 'state_dict'):
+                self._states[k] = self._states[k].state_dict()
+        pickle.dump(self._states, state_file.open('wb'))
 
     @property
     def id(self):
@@ -187,18 +192,31 @@ class Run:
 
     @optional(None)
     def value(self, name, value):
-        pass
+        if name is None:
+            name = str(self._index)
+            self._index += 1
+        if name in self._states:
+            return self._states[name]
+        else:
+            self._states[name] = value
+            return value
 
     @optional(None)
     def register(self, name, obj):
-        pass
+        if name is None:
+            name = str(self._index)
+            self._index += 1
+        if name in self._states:
+            obj.load_state_dict(self._states[name])
+
+        self._states[name] = obj
+        return obj
 
     @optional(None)
-    def acc(self, name, initial):
-        pass
+    def acc(self, name):
+        return self.register(name, Accumulator())
 
-    @optional(None)
-    def range(self, name, default):
+    def range(self, *args):
         pass
 
     @staticmethod
@@ -208,20 +226,38 @@ class Run:
         else:
             p.parent.mkdir(parents=True, exist_ok=True)
 
-    def log(self, filename='.'):
-        path = self._ws.path.joinpath('log', self._id, filename)
-        self._mkdir(path, filename.endswith('/') or filename == '.')
+    def log(self, *filename):
+        path = self._ws.path.joinpath('log', self._id, *filename)
+        self._mkdir(path, not filename or filename[-1].endswith('/'))
         return path
 
-    def result(self, filename='.'):
-        path = self._ws.path.joinpath('result', self._id, filename)
-        self._mkdir(path, filename.endswith('/') or filename == '.')
+    def result(self, *filename):
+        path = self._ws.path.joinpath('result', self._id, *filename)
+        self._mkdir(path, not filename or filename[-1].endswith('/'))
         return path
 
-    def checkpoint(self, filename='.'):
-        path = self._ws.path.joinpath('checkpoint', self._id, filename)
-        self._mkdir(path, filename.endswith('/') or filename == '.')
+    def checkpoint(self, *filename):
+        path = self._ws.path.joinpath('checkpoint', self._id, *filename)
+        self._mkdir(path, not filename or filename[-1].endswith('/'))
         return path
+
+
+@stateful(['_sum', '_cnt'])
+class Accumulator:
+    def __init__(self, initial=0):
+        self._sum = initial
+        self._cnt = 0
+
+    def __iadd__(self, other):
+        self._sum += other
+        self._cnt += 1
+        return self
+
+    def sum(self):
+        return self._sum
+
+    def mean(self):
+        return self._sum / self._cnt if self._cnt > 0 else self._sum
 
 
 class Builder:

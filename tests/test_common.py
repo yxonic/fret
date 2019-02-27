@@ -87,13 +87,28 @@ def test_workspace(tmpdir: py.path.local):
         rid = run.id
         assert rid.startswith('test')
         assert run.checkpoint().is_dir()
+        x = run.value(3)
+        assert x == 3
+        s = run.acc()
+        s += 1
+        assert s.sum() == 1
 
     with ws.run('test') as run:
         assert run.id == rid
+        x = run.value(5)
+        assert x == 3
+        s = run.acc()
+        s += 2
+        assert s.sum() == 3
 
     with ws.run('test', resume=False) as run:
         assert run.id != rid
         rid = run.id
+        x = run.value(5)
+        assert x == 5
+        s = run.acc()
+        s += 2
+        assert s.sum() == 2
 
     with ws.run('test') as run:
         assert run.id == rid
