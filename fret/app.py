@@ -133,16 +133,6 @@ class App:
                     _cfg = cfg.copy()
                     _cfg.update(kwargs)
                     Module.__init__(self, **_cfg)
-                else:
-                    # update config with function default values
-                    for k, v in cfg.items():
-                        if k not in self.config.cfg:
-                            self.config.cfg[k] = v
-
-                    # get args from config
-                    for k in self.config.cfg:
-                        if k in allowed_args:
-                            cfg[k] = self.config.cfg[k]
 
                 if varkw is None:
                     orig_init(self, **cfg)

@@ -10,15 +10,15 @@ import fret.util
 # noinspection PyUnusedLocal
 @fret.configurable
 class A:
-    def __init__(self, a):
+    def __init__(self, a=0):
         pass
 
 
 # noinspection PyUnusedLocal
 @fret.configurable
-class B:
-    def __init__(self, b):
-        pass
+class B(A):
+    def __init__(self, b, **others):
+        super().__init__(**others)
 
 
 # noinspection PyUnusedLocal
