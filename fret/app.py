@@ -9,7 +9,7 @@ from collections import namedtuple
 import toml
 
 from .common import Module, Workspace
-from .util import classproperty, Configuration, to_snake, to_camel
+from .util import classproperty, Configuration
 
 
 class arg:
@@ -57,7 +57,7 @@ class App:
 
     def register_command(self, cls, name=None):
         if name is None:
-            name = to_snake(cls.__name__)
+            name = cls.__name__
         self._commands[name] = cls
 
     def load_module(self, name):
@@ -196,7 +196,7 @@ class App:
             def run(self, ws, args):
                 return new_f(ws, **args._asdict())
 
-        Cmd.__name__ = to_camel(f.name)
+        Cmd.__name__ = f.name
         self.register_command(Cmd)
 
         return new_f

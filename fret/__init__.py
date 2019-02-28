@@ -16,7 +16,7 @@ class _ColoredFormatter(logging.Formatter):
         'ERROR': 'r'
     }
 
-    def format(self, record):
+    def format(self, record):  # pragma: no cover
         levelname = record.levelname
         if levelname in self._LOG_COLORS:
             record.levelname = colored(

@@ -2,7 +2,6 @@ import functools
 import inspect
 import itertools
 import logging
-import re
 import signal
 from collections import OrderedDict
 
@@ -138,19 +137,6 @@ def colored(fmt, fg=None, bg=None, style=None):
         return '\x1b[%sm%s\x1b[0m' % (props, fmt)
     else:
         return fmt
-
-
-_first_cap_re = re.compile('(.)([A-Z][a-z]+)')
-_all_cap_re = re.compile('([a-z0-9])([A-Z])')
-
-
-def to_snake(name):
-    s1 = _first_cap_re.sub(r'\1_\2', name)
-    return _all_cap_re.sub(r'\1_\2', s1).lower()
-
-
-def to_camel(name):
-    return ''.join(x[0].upper() + x[1:] for x in name.split('_'))
 
 
 def optional(default, position=1):

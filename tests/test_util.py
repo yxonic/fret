@@ -52,11 +52,3 @@ def test_classproperty():
     assert A.name == 'A'
     assert B.name == 'B'
     assert C.name == 'A'
-
-
-def test_naming():
-    to_camel = fret.util.to_camel
-    to_snake = fret.util.to_snake
-
-    assert to_camel(to_snake('Html5ParserSimple')) == 'Html5ParserSimple'
-    assert to_snake(to_camel('funny_joke3')) == 'funny_joke3'
