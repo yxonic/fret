@@ -40,26 +40,19 @@ class Workspace:
         cp = self.path.joinpath('config.toml')
         return cp
 
-    @staticmethod
-    def _mkdir(p, is_dir=False):
-        if is_dir:
-            p.mkdir(parents=True, exist_ok=True)
-        else:
-            p.parent.mkdir(parents=True, exist_ok=True)
-
     def log(self, *filename):
         path = self.path.joinpath('log', *filename)
-        self._mkdir(path, not filename or filename[-1].endswith('/'))
+        _mkdir(path, not filename or filename[-1].endswith('/'))
         return path
 
     def result(self, *filename):
         path = self.path.joinpath('result', *filename)
-        self._mkdir(path, not filename or filename[-1].endswith('/'))
+        _mkdir(path, not filename or filename[-1].endswith('/'))
         return path
 
     def checkpoint(self, *filename):
         path = self.path.joinpath('checkpoint', *filename)
-        self._mkdir(path, not filename or filename[-1].endswith('/'))
+        _mkdir(path, not filename or filename[-1].endswith('/'))
         return path
 
     @optional('main')
@@ -230,26 +223,19 @@ class Run:
             args = args[1:]
         return self.register(name, Range(*args))
 
-    @staticmethod
-    def _mkdir(p, is_dir=False):
-        if is_dir:
-            p.mkdir(parents=True, exist_ok=True)
-        else:
-            p.parent.mkdir(parents=True, exist_ok=True)
-
     def log(self, *filename):
         path = self._ws.path.joinpath('log', self._id, *filename)
-        self._mkdir(path, not filename or filename[-1].endswith('/'))
+        _mkdir(path, not filename or filename[-1].endswith('/'))
         return path
 
     def result(self, *filename):
         path = self._ws.path.joinpath('result', self._id, *filename)
-        self._mkdir(path, not filename or filename[-1].endswith('/'))
+        _mkdir(path, not filename or filename[-1].endswith('/'))
         return path
 
     def checkpoint(self, *filename):
         path = self._ws.path.joinpath('checkpoint', self._id, *filename)
-        self._mkdir(path, not filename or filename[-1].endswith('/'))
+        _mkdir(path, not filename or filename[-1].endswith('/'))
         return path
 
 
@@ -394,3 +380,12 @@ class Module:
 
     def __repr__(self):
         return str(self)
+
+
+def _mkdir(p, is_dir=False):
+    if is_dir:
+        if not p.exists():
+            p.mkdir(parents=True)
+    else:
+        if not p.parent.exists():
+            p.parent.mkdir(parents=True)
