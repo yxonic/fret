@@ -1,5 +1,6 @@
 import abc
 import functools
+import importlib
 import inspect as ins
 import os
 import pathlib
@@ -49,6 +50,17 @@ class App:
         else:
             cfg = {}
         self._config = Configuration(cfg)
+
+    def import_modules(self):
+        if 'appname' in self._config:
+            importlib.import_module(self._config.appname)
+        else:
+            for appname in ['main', 'app']:
+                try:
+                    importlib.import_module(appname)
+                except ImportError:
+                    continue
+                break  # found main app
 
     def register_module(self, cls, name=None):
         if name is None:
@@ -186,7 +198,7 @@ class App:
             def run(self, ws, args):
                 return new_f(ws, **args._asdict())
 
-        Cmd.__name__ = f.name
+        Cmd.__name__ = f.__name__
         self.register_command(Cmd)
 
         return new_f

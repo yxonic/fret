@@ -64,9 +64,7 @@ class config(Command):
                 print('[%s] configured "%s" as "%s" with %s' %
                       (ws, args.name, m, str(cfg)),
                       file=sys.stderr)
-                ws.load()
-                ws.register(args.name, m, **cfg)
-                ws.save()
+                ws.register(args.name, app.load_module(m), **cfg)
 
             sub.set_defaults(func=save)
 
@@ -133,6 +131,7 @@ def real_main(args):
 def main(args=None):
     app.register_command(config)
     app.register_command(clean)
+    app.import_modules()
 
     main_parser.add_argument('-w', '--workspace', help='workspace dir')
     main_parser.add_argument('-q', action='store_true', help='quiet')

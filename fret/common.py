@@ -266,6 +266,12 @@ class Accumulator:
         self._cnt += 1
         return self
 
+    def __int__(self):
+        return int(self._sum)
+
+    def __float__(self):
+        return float(self._sum)
+
     def clear(self):
         self._sum = 0
         self._cnt = 0
@@ -289,8 +295,9 @@ class Range:
         self._start = r.start
 
     def __iter__(self):
-        for self.start in range(self.start, self.stop, self.step):
-            yield self.start
+        for i in range(self.start, self.stop, self.step):
+            self.start = i + self.step
+            yield i
 
     def clear(self):
         self.start = self._start
