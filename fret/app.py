@@ -323,3 +323,5 @@ app = App()
 workspace = app.workspace
 configurable = app.configurable
 command = app.command
+
+__all__ = ['app', 'workspace', 'configurable', 'command', 'arg']

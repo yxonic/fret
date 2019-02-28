@@ -302,7 +302,7 @@ class Builder:
 
     def __str__(self):
         cls_name, cfg = self.ws._modules[self._name]
-        return cls_name + str(cfg)
+        return cls_name + '(' + str(cfg) + ')'
 
     def __repr__(self):
         return str(self)
@@ -389,3 +389,6 @@ def _mkdir(p, is_dir=False):
     else:
         if not p.parent.exists():
             p.parent.mkdir(parents=True)
+
+
+__all__ = ['Workspace', 'Run', 'Accumulator', 'Range', 'Module', 'Builder']

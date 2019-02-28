@@ -1,13 +1,14 @@
-from .util import colored, nonbreak, stateful
-from .app import *
+from .util import nonbreak, stateful
+from .util import colored as _colored
+from .app import workspace, configurable, command, arg
 
-import logging
+import logging as _logging
 
-_logger = logging.getLogger()
-_logger.setLevel(logging.INFO)
+_logger = _logging.getLogger()
+_logger.setLevel(_logging.INFO)
 
 
-class _ColoredFormatter(logging.Formatter):
+class _ColoredFormatter(_logging.Formatter):
     _LOG_COLORS = {
         'WARNING': 'y',
         'INFO': 'g',
@@ -19,22 +20,18 @@ class _ColoredFormatter(logging.Formatter):
     def format(self, record):  # pragma: no cover
         levelname = record.levelname
         if levelname in self._LOG_COLORS:
-            record.levelname = colored(
+            record.levelname = _colored(
                 record.levelname[0],
                 self._LOG_COLORS[record.levelname],
                 style='b'
             )
-        return logging.Formatter.format(self, record)
+        return _logging.Formatter.format(self, record)
 
 
-log_formatter = _ColoredFormatter(
+_log_formatter = _ColoredFormatter(
     '%(levelname)s %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
-console_handler = logging.StreamHandler()
-console_handler.setFormatter(log_formatter)
-_logger.addHandler(console_handler)
-
-
-__all__ = ['app', 'workspace', 'configurable', 'command', 'arg',
-           'nonbreak', 'stateful']
+_console_handler = _logging.StreamHandler()
+_console_handler.setFormatter(_log_formatter)
+_logger.addHandler(_console_handler)
