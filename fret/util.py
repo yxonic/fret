@@ -48,10 +48,12 @@ class Configuration:
         return len(self._config)
 
     def __str__(self):
-        return str(self._config)
+        return ', '.join(k + '=' + str(v)
+                         for k, v in self._config.items()
+                         if not k.startswith('_'))
 
     def __repr__(self):
-        return str(self._config)
+        return ', '.join(k + '=' + str(v) for k, v in self._config.items())
 
     def _dict(self):
         return self._config

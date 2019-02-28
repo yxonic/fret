@@ -376,7 +376,7 @@ class Module:
         self._ws = None
 
     def __str__(self):
-        return self.__class__.__name__ + str(self.config)
+        return self.__class__.__name__ + '(' + str(self.config) + ')'
 
     def __repr__(self):
         return str(self)
