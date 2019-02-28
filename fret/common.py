@@ -76,7 +76,7 @@ class Workspace:
                for name, (cls_name, cfg) in self._modules.items()}
         toml.dump(cfg, self.config_path.open('w'))
 
-    def _get_module(self, name='main'):
+    def _try_get_module(self, name='main'):
         if name in self._modules:
             return self._modules[name]
         else:
@@ -85,7 +85,7 @@ class Workspace:
     def build(self, name='main', **kwargs):
         """Build module according to the configurations in current
         workspace."""
-        cls_name, cfg = self._get_module(name)
+        cls_name, cfg = self._try_get_module(name)
         cfg = cfg.copy()
         cfg.update(kwargs)
 
@@ -110,13 +110,19 @@ class Workspace:
         env = self._modules
         args = obj.spec._dict() if hasattr(obj, 'spec') else {}
         state = obj.state_dict()
-        pickle.dump({'env': env, 'args': args, 'state': state},
-                    self.checkpoint(name + '.' + tag + '.pt').open('wb'))
+        if isinstance(tag, str) and '/' not in tag:
+            f = self.checkpoint(name + '.' + tag + '.pt')
+        else:
+            f = pathlib.Path(tag)
+        pickle.dump({'env': env, 'args': args, 'state': state}, f.open('wb'))
 
     @optional('main')
     def load(self, name, tag):
-        state = pickle.load(
-            self.checkpoint(name + '.' + tag + '.pt').open('rb'))
+        if isinstance(tag, str) and '/' not in tag:
+            f = self.checkpoint(name + '.' + tag + '.pt')
+        else:
+            f = pathlib.Path(tag)
+        state = pickle.load(f.open('rb'))
         last_ws = Workspace(self._app, self._path, state['env'])
         obj = last_ws.build(name, **state['args'])
         obj.load_state_dict(state['state'])
