@@ -1,7 +1,4 @@
-import os
-
 import fret.util
-import py
 
 
 def test_configuration():

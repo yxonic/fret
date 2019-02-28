@@ -4,6 +4,7 @@ import py
 import pytest
 
 import fret
+import fret.util
 
 
 # noinspection PyUnusedLocal
@@ -93,6 +94,10 @@ def test_workspace(tmpdir: py.path.local):
         s += 1
         assert s.sum() == 1
 
+        for i in fret.util.nonbreak(run.range(10)):
+            if i >= 5:
+                break
+
     with ws.run('test') as run:
         assert run.id == rid
         x = run.value(5)
@@ -100,6 +105,10 @@ def test_workspace(tmpdir: py.path.local):
         s = run.acc()
         s += 2
         assert s.sum() == 3
+
+        for i in fret.util.nonbreak(run.range(10)):
+            assert i == 5
+            break
 
     with ws.run('test', resume=False) as run:
         assert run.id != rid
@@ -109,6 +118,10 @@ def test_workspace(tmpdir: py.path.local):
         s = run.acc()
         s += 2
         assert s.sum() == 2
+
+        for i in fret.util.nonbreak(run.range(10)):
+            assert i == 0
+            break
 
     with ws.run('test') as run:
         assert run.id == rid

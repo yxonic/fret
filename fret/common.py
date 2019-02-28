@@ -217,7 +217,12 @@ class Run:
         return self.register(name, Accumulator())
 
     def range(self, *args):
-        pass
+        if not args or not isinstance(args[0], str):
+            name = None
+        else:
+            name = args[0]
+            args = args[1:]
+        return self.register(name, Range(*args))
 
     @staticmethod
     def _mkdir(p, is_dir=False):
@@ -244,8 +249,10 @@ class Run:
 
 @stateful(['_sum', '_cnt'])
 class Accumulator:
-    def __init__(self, initial=0):
-        self._sum = initial
+    __slots__ = ['_sum', '_cnt']
+
+    def __init__(self):
+        self._sum = 0
         self._cnt = 0
 
     def __iadd__(self, other):
@@ -253,11 +260,34 @@ class Accumulator:
         self._cnt += 1
         return self
 
+    def clear(self):
+        self._sum = 0
+        self._cnt = 0
+
     def sum(self):
         return self._sum
 
     def mean(self):
         return self._sum / self._cnt if self._cnt > 0 else self._sum
+
+
+@stateful(['start', 'step', 'stop', '_start'])
+class Range:
+    __slots__ = ['start', 'step', 'stop', '_start']
+
+    def __init__(self, *args):
+        r = range(*args)
+        self.start = r.start
+        self.step = r.step
+        self.stop = r.stop
+        self._start = r.start
+
+    def __iter__(self):
+        for self.start in range(self.start, self.stop, self.step):
+            yield self.start
+
+    def clear(self):
+        self.start = self._start
 
 
 class Builder:

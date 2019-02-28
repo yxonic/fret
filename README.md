@@ -108,7 +108,7 @@ foo='bar'
 ## TODO
 - [x] `fret.Configuration`: high-level class for configuration
 - [x] `fret.Workspace`: module build/save/load (by tag or by path)
-- [ ] `ws.run()` context manager, `run.value()`, `run.acc()`, `run.range()`, `run.register()`
+- [x] `ws.run()` context manager, `run.value()`, `run.acc()`, `run.range()`, `run.register()`
 - [ ] `@fret.configurable`: add ws parameter, parameter checking
 - [x] `fret.App`, global app object
 - [ ] CLI: entry point logic, testing, tagged workspace

@@ -1,4 +1,4 @@
-from .util import colored
+from .util import colored, nonbreak, stateful
 from .app import *
 
 import logging
@@ -36,4 +36,5 @@ console_handler.setFormatter(log_formatter)
 _logger.addHandler(console_handler)
 
 
-__all__ = ['app', 'workspace', 'configurable', 'command', 'arg']
+__all__ = ['app', 'workspace', 'configurable', 'command', 'arg',
+           'nonbreak', 'stateful']

@@ -1,6 +1,9 @@
 import functools
 import inspect
+import itertools
+import logging
 import re
+import signal
 from collections import OrderedDict
 
 
@@ -178,3 +181,29 @@ def stateful(states):
         cls.load_state_dict = load_state_dict
         return cls
     return wrapper
+
+
+_sigint_handler = signal.getsignal(signal.SIGINT)
+
+
+def nonbreak(f=None):  # pragma: no cover
+    if f is not None:
+        it = iter(f)
+    else:
+        it = itertools.count()
+    signal_received = ()
+
+    def handler(sig, frame):
+        nonlocal signal_received
+        signal_received = (sig, frame)
+        logging.warning('SIGINT received. Delaying KeyboardInterrupt.')
+
+    while True:
+        try:
+            signal.signal(signal.SIGINT, handler)
+            yield next(it)
+            signal.signal(signal.SIGINT, _sigint_handler)
+            if signal_received:
+                _sigint_handler(signal_received)
+        except StopIteration:
+            break
