@@ -6,7 +6,7 @@ import sys
 
 from . import common
 from . import util
-from .app import Command
+from .app import app, Command
 
 
 class _ArgumentParser(argparse.ArgumentParser):
@@ -23,7 +23,7 @@ main_parser = _ArgumentParser(
 subparsers = {}
 
 
-class Config(Command):
+class config(Command):
     """Command ``config``,
 
     Configure a module and its parameters for a workspace.
@@ -43,7 +43,7 @@ class Config(Command):
         subs = parser.add_subparsers(title='modules available', dest='module')
         group_options = collections.defaultdict(set)
         try:
-            _modules = common.app['modules']
+            _modules = app._modules
         except ImportError:
             _modules = {}
 
@@ -57,28 +57,28 @@ class Config(Command):
                 group_options[module].add(action.dest)
 
             def save(args):
-                ws = common.Workspace(args.workspace)
+                ws = app.workspace(args.workspace)
                 m = args.module
-                config = {name: value for (name, value) in args._get_kwargs()
-                          if name in group_options[m]}
+                cfg = {name: value for (name, value) in args._get_kwargs()
+                       if name in group_options[m]}
                 print('[%s] configured "%s" as "%s" with %s' %
-                      (ws, args.name, m, str(config)),
+                      (ws, args.name, m, str(cfg)),
                       file=sys.stderr)
                 ws.load()
-                ws.add_module(args.name, m, config)
+                ws.register(args.name, m, **cfg)
                 ws.save()
 
             sub.set_defaults(func=save)
 
     def run(self, ws, args):
-        config = ws.config_path.open().read().strip()
-        if config:
-            print(config)
+        cfg = ws.config_path.open().read().strip()
+        if cfg:
+            print(cfg)
         else:
             raise common.NotConfiguredError
 
 
-class Clean(Command):
+class clean(Command):
     """Command ``clean``.
 
     Remove all checkpoints in specific workspace. If ``--all`` is specified,
@@ -131,9 +131,8 @@ def real_main(args):
 
 
 def main(args=None):
-    common.get_app()
-    common.register_command(Config)
-    common.register_command(Clean)
+    app.register_command(config)
+    app.register_command(clean)
 
     main_parser.add_argument('-w', '--workspace', help='workspace dir')
     main_parser.add_argument('-q', action='store_true', help='quiet')
@@ -143,7 +142,7 @@ def main(args=None):
                                              dest='command')
     _subparsers.required = True
 
-    for _cmd, _cls in common.app['commands'].items():
+    for _cmd, _cls in app._commands.items():
         _sub = _subparsers.add_parser(
             _cmd, help=_cls.help,
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
