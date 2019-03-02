@@ -441,6 +441,7 @@ class config(Command):
         cfg = ws.config_path.open().read().strip()
         if cfg:
             print(cfg)
+            return cfg
         else:
             raise NotConfiguredError
 

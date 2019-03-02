@@ -26,16 +26,20 @@ def test_main(tmpdir: py.path.local):
     with pytest.raises(SystemExit):
         main()
 
-    appdir = tmpdir.join('appdir')
+    appdir = tmpdir.join('appdir1')
     appdir.mkdir()
+
     with appdir.join('main.py').open('w') as f:
         f.write(code1)
 
     with chapp(appdir) as app:
         app.main(['config', 'Model'])
         model = app.main(['run'])
-
         assert model.config.x == 3
+        assert app.main(['config']) is not None
+        app.main(['clean', '-c'])
+        with pytest.raises(SystemExit):
+            app.main(['run'])
 
 
 @contextmanager

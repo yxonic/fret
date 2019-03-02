@@ -360,20 +360,6 @@ class Module:
         """Add arguments to an argparse subparser."""
         pass
 
-    @classmethod
-    def parse(cls, args):
-        """Parse command-line options and build module."""
-
-        class _ArgumentParser(argparse.ArgumentParser):
-            def error(self, message):
-                raise ParseError(message)
-
-        parser = _ArgumentParser(prog='', add_help=False)
-        cls._add_arguments(parser)
-        args = parser.parse_args(args)
-        config = dict(args._get_kwargs())
-        return cls(**config)
-
     def __init__(self, **kwargs):
         """
         Args:

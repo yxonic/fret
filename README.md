@@ -1,7 +1,8 @@
 # fret
 
-[![PyPI](https://img.shields.io/pypi/v/fret.svg)](https://pypi.python.org/pypi/fret) 
-[![Build Status](https://travis-ci.org/yxonic/fret.svg?branch=master)](https://travis-ci.org/yxonic/fret) [![Coverage Status](https://coveralls.io/repos/github/yxonic/fret/badge.svg?branch=master)](https://coveralls.io/github/yxonic/fret?branch=master)
+[![PyPI](https://img.shields.io/pypi/v/fret.svg)](https://pypi.python.org/pypi/fret)
+[![Travis (.org)](https://img.shields.io/travis/yxonic/fret.svg)](https://travis-ci.org/yxonic/fret)
+[![Coveralls github](https://img.shields.io/coveralls/github/yxonic/fret.svg)](https://coveralls.io/github/yxonic/fret?branch=master)
 
 Framework for Reproducible ExperimenTs
 
