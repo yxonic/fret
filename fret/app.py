@@ -409,7 +409,12 @@ class config(Command):
     def __init__(self, app, parser):
         parser.add_argument('name', default='main', nargs='?',
                             help='module name')
-        subs = parser.add_subparsers(title='modules available', dest='module')
+        if sys.version_info < (3, 7):
+            subs = parser.add_subparsers(title='modules available',
+                                         dest='module')
+        else:
+            subs = parser.add_subparsers(title='modules available',
+                                         dest='module', required=False)
         group_options = collections.defaultdict(set)
         try:
             _modules = app._modules
