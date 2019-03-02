@@ -57,14 +57,14 @@ class config(Command):
                 group_options[module].add(action.dest)
 
             def save(args):
-                ws = app.workspace(args.workspace)
-                m = args.module
-                cfg = {name: value for (name, value) in args._get_kwargs()
-                       if name in group_options[m]}
-                print('[%s] configured "%s" as "%s" with %s' %
-                      (ws, args.name, m, str(cfg)),
-                      file=sys.stderr)
-                ws.register(args.name, app.load_module(m), **cfg)
+                with app.workspace(args.workspace) as ws:
+                    m = args.module
+                    cfg = {name: value for (name, value) in args._get_kwargs()
+                           if name in group_options[m]}
+                    print('[%s] configured "%s" as "%s" with %s' %
+                          (ws, args.name, m, str(cfg)),
+                          file=sys.stderr)
+                    ws.register(args.name, app.load_module(m), **cfg)
 
             sub.set_defaults(func=save)
 

@@ -150,7 +150,7 @@ foo='bar'
 
 ## TODO
 - [x] `fret.Configuration`: high-level class for configuration
-- [x] `fret.Workspace`: module build/save/load (by tag or by path)
+- [x] `fret.Workspace`: module build/save/load (by tag or by path), persistency
 - [x] `ws.run()` context manager, `run.value()`, `run.acc()`, `run.range()`, `run.register()`
 - [ ] `@fret.configurable`: parameter checking
 - [x] `fret.App`, global app object

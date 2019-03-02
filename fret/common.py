@@ -65,9 +65,16 @@ class Workspace:
         else:
             self._modules[name] = (module.__name__, kwargs)
 
+    def write(self):
         cfg = {name: dict({'module': cls_name}, **cfg)
                for name, (cls_name, cfg) in self._modules.items()}
         toml.dump(cfg, self.config_path.open('w'))
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.write()
 
     def _try_get_module(self, name='main'):
         if name in self._modules:
