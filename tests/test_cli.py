@@ -1,29 +1,53 @@
-import fret
+import os
+from contextlib import contextmanager
+
+from fret.app import App, get_app, set_global_app
 from fret.cli import main
+import py
 import pytest
 
+code1 = '''
+import fret
 
-# noinspection PyUnusedLocal
 @fret.configurable
-class A:
-    def __init__(self, a):
-        pass
+class Model:
+    def __init__(self, x=3, y=4):
+        ...
+
+@fret.command
+def run(ws):
+    model = ws.build()
+    print(model)
+    return model
+'''
 
 
-# noinspection PyUnusedLocal
-@fret.configurable
-class B(A):
-    def __init__(self, b, **others):
-        super().__init__(**others)
-
-
-# noinspection PyUnusedLocal
-@fret.configurable(submodules=['sub'])
-class C:
-    def __init__(self, sub, c):
-        self.b = sub()
-
-
-def test_main():
+def test_main(tmpdir: py.path.local):
     with pytest.raises(SystemExit):
         main()
+
+    appdir = tmpdir.join('appdir')
+    appdir.mkdir()
+    with appdir.join('main.py').open('w') as f:
+        f.write(code1)
+
+    with chapp(appdir) as app:
+        app.main(['config', 'Model'])
+        model = app.main(['run'])
+
+        assert model.config.x == 3
+
+
+@contextmanager
+def chapp(appdir):
+    _app = get_app()
+    _cwd = os.getcwd()
+    appdir = str(appdir)
+    app = App()
+    os.chdir(appdir)
+    set_global_app(app)
+    try:
+        yield app
+    finally:
+        set_global_app(_app)
+        os.chdir(_cwd)

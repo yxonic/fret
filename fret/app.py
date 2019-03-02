@@ -1,22 +1,35 @@
 import abc
+import argparse
+import collections
 import functools
 import importlib
 import inspect as ins
+import logging
 import os
 import pathlib
+import shutil
 import sys
 from collections import namedtuple
 
 import toml
 
+from .exceptions import NotConfiguredError
 from .common import Module, Workspace
-from .util import classproperty, Configuration
+from .util import classproperty, Configuration, colored
 
 
 class arg:
     def __init__(self, *args, **kwargs):
         self.args = args
         self.kwargs = kwargs
+
+
+class _ArgumentParser(argparse.ArgumentParser):
+    def error(self, message):
+        # customize error message
+        self.print_usage(sys.stderr)
+        err = colored('error:', 'r', style='b')
+        self.exit(2, '%s %s\n' % (err, message))
 
 
 class App:
@@ -38,6 +51,7 @@ class App:
                     p = p.parent
                 else:
                     path = '.'
+
         sys.path.append(path)
         self._root = pathlib.Path(path)
 
@@ -91,6 +105,65 @@ class App:
 
     def __getattr__(self, key):
         return getattr(self.config, key)
+
+    def main(self, args=None):
+        self.register_command(config)
+        self.register_command(clean)
+        self.import_modules()
+
+        main_parser = _ArgumentParser(
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+            prog='fret')
+
+        main_parser.add_argument('-w', '--workspace', help='workspace dir')
+        main_parser.add_argument('-q', action='store_true', help='quiet')
+        main_parser.add_argument('-v', action='store_true', help='verbose')
+
+        _subparsers = main_parser.add_subparsers(title='supported commands',
+                                                 dest='command')
+        _subparsers.required = True
+
+        subparsers = {}
+        for _cmd, _cls in self._commands.items():
+            _sub = _subparsers.add_parser(
+                _cmd, help=_cls.help,
+                formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+            subparsers[_cmd] = _sub
+            _sub.set_defaults(func=_cls(self, _sub)._run)
+
+        args = main_parser.parse_args() if args is None \
+            else main_parser.parse_args(args)
+
+        # configure logger
+        _logger = logging.getLogger()
+        if args.q:
+            _logger.setLevel(logging.WARNING)
+        elif args.v:
+            _logger.setLevel(logging.DEBUG)
+        else:
+            _logger.setLevel(logging.INFO)
+
+        # remove logging related options
+        del args.q
+        del args.v
+
+        logger = logging.getLogger(args.command)
+        try:
+            return args.func(args)
+        except KeyboardInterrupt:  # pragma: no cover
+            # print traceback info to screen only
+            import traceback
+            sys.stderr.write(traceback.format_exc())
+            logger.warning('cancelled by user')
+        except NotConfiguredError as e:  # pragma: no cover
+            print('error:', e)
+            subparsers['config'].print_usage()
+            sys.exit(1)
+        except Exception as e:  # pragma: no cover
+            # print traceback info to screen only
+            import traceback
+            sys.stderr.write(traceback.format_exc())
+            logger.error('exception occurred: %s', e)
 
     def configurable(self, cls=None, submodules=None, states=None):
         def wrapper(cls):
@@ -190,7 +263,7 @@ class App:
             return f(*args, **cfg)
 
         class Cmd(Command):
-            def __init__(self, parser):
+            def __init__(self, _app, parser):
                 for arg in _args[1:]:
                     parser.add_argument('-' + arg)
                 App._add_arguments_by_kwargs(parser, config)
@@ -307,7 +380,7 @@ class Command(abc.ABC):
         return 'command ' + cls.__name__.lower()
 
     def _run(self, args):
-        ws = app.workspace(args.workspace)
+        ws = get_app().workspace(args.workspace)
         cmd = args.command
         del args.command, args.func, args.workspace
         args = {name: value for (name, value) in args._get_kwargs()}
@@ -319,9 +392,114 @@ class Command(abc.ABC):
         raise NotImplementedError
 
 
-app = App()
-workspace = app.workspace
-configurable = app.configurable
-command = app.command
+class config(Command):
+    """Command ``config``,
 
-__all__ = ['app', 'workspace', 'configurable', 'command', 'arg']
+    Configure a module and its parameters for a workspace.
+
+    Example:
+        .. code-block:: bash
+
+            $ python app.run -w ws/test config Simple -foo=5
+            In [ws/test]: configured Simple with Config(foo='5')
+    """
+
+    help = 'configure module for workspace'
+
+    def __init__(self, app, parser):
+        parser.add_argument('name', default='main', nargs='?',
+                            help='module name')
+        subs = parser.add_subparsers(title='modules available', dest='module')
+        group_options = collections.defaultdict(set)
+        try:
+            _modules = app._modules
+        except ImportError:
+            _modules = {}
+
+        for module, module_cls in _modules.items():
+            _parser_formatter = argparse.ArgumentDefaultsHelpFormatter
+            sub = subs.add_parser(module, help=module_cls.help,
+                                  formatter_class=_parser_formatter)
+            group = sub.add_argument_group('config')
+            module_cls._add_arguments(group)
+            for action in group._group_actions:
+                group_options[module].add(action.dest)
+
+            def save(args):
+                with get_app().workspace(args.workspace) as ws:
+                    m = args.module
+                    cfg = {name: value for (name, value) in args._get_kwargs()
+                           if name in group_options[m]}
+                    print('[%s] configured "%s" as "%s" with %s' %
+                          (ws, args.name, m, str(cfg)),
+                          file=sys.stderr)
+                    ws.register(args.name, get_app().load_module(m), **cfg)
+
+            sub.set_defaults(func=save)
+
+    def run(self, ws, args):
+        cfg = ws.config_path.open().read().strip()
+        if cfg:
+            print(cfg)
+        else:
+            raise NotConfiguredError
+
+
+class clean(Command):
+    """Command ``clean``.
+
+    Remove all checkpoints in specific workspace. If ``--all`` is specified,
+    clean the entire workspace
+    """
+
+    help = 'clean workspace'
+
+    def __init__(self, _, parser):
+        parser.add_argument('--all', action='store_true',
+                            help='clean the entire workspace')
+        parser.add_argument('-c', dest='config', action='store_true',
+                            help='clear workspace configuration')
+        parser.add_argument('-l', dest='log', action='store_true',
+                            help='clear workspace logs')
+
+    def run(self, ws, args):
+        if args.all:
+            shutil.rmtree(str(ws))
+        else:
+            if args.config:
+                try:
+                    (ws.path / 'config.toml').unlink()
+                except FileNotFoundError:
+                    pass
+            if args.log:
+                shutil.rmtree(str(ws.log_path))
+            else:
+                shutil.rmtree(str(ws.checkpoint_path))
+
+
+_app = App()
+
+
+def get_app():
+    return _app
+
+
+def set_global_app(app):
+    global _app
+    _app = app
+
+
+def workspace(*args, **kwargs):
+    return get_app().workspace(*args, **kwargs)
+
+
+def configurable(*args, **kwargs):
+    return get_app().configurable(*args, **kwargs)
+
+
+def command(*args, **kwargs):
+    return get_app().command(*args, **kwargs)
+
+
+__all__ = ['get_app', 'set_global_app', 'workspace',
+           'configurable', 'command', 'arg']
