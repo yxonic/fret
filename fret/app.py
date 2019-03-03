@@ -33,7 +33,7 @@ class _ArgumentParser(argparse.ArgumentParser):
 
 
 class App:
-    __slots__ = ['_root', '_config', '_commands', '_modules', '_cwd']
+    __slots__ = ['_root', '_config', '_commands', '_modules', '_cwd', '_imp']
 
     def __init__(self, path=None):
         self._cwd = None
@@ -49,11 +49,32 @@ class App:
                         os.chdir(path)
                         break
                     p = p.parent
+
+            if path is None:
+                # no fret.toml found, search for default app names
+                p = pathlib.Path().absolute()
+                for appname in ['main', 'app']:
+                    if p.joinpath('%s.py' % appname).exists():
+                        path = str(p)
+                        break
                 else:
-                    path = '.'
+                    while p != pathlib.Path(p.root):
+                        for appname in ['main', 'app']:
+                            if p.joinpath('%s.py' % appname).exists():
+                                path = str(p)
+                                self._cwd = os.getcwd()
+                                os.chdir(path)
+                                break
+                        else:
+                            p = p.parent
+                            continue
+                        break
+                    else:
+                        path = '.'
 
         sys.path.append(path)
         self._root = pathlib.Path(path)
+        self._imp = None
 
         self._config = None
         self._commands = {}
@@ -66,12 +87,14 @@ class App:
         self._config = Configuration(cfg)
 
     def import_modules(self):
+        if self._imp is not None:
+            importlib.reload(self._imp)
         if 'appname' in self._config:
-            importlib.import_module(self._config.appname)
+            self._imp = importlib.import_module(self._config.appname)
         else:
             for appname in ['main', 'app']:
                 try:
-                    importlib.import_module(appname)
+                    self._imp = importlib.import_module(appname)
                 except ImportError:
                     continue
                 break  # found main app
@@ -165,7 +188,7 @@ class App:
             sys.stderr.write(traceback.format_exc())
             logger.error('exception occurred: %s', e)
 
-    def configurable(self, cls=None, submodules=None, states=None):
+    def configurable(self, wraps=None, submodules=None, states=None):
         def wrapper(cls):
             orig_init = cls.__init__
             positional, config, varkw = self._get_args(orig_init)
@@ -238,10 +261,10 @@ class App:
                 self.register_module(cls)
             return cls
 
-        if cls is None:
+        if wraps is None:
             return wrapper
         else:
-            return wrapper(cls)
+            return wrapper(wraps)
 
     def command(self, f):
         _args, config, _ = self._get_args(f)
@@ -443,12 +466,13 @@ class config(Command):
             sub.set_defaults(func=save)
 
     def run(self, ws, args):
-        cfg = ws.config_path.open().read().strip()
-        if cfg:
+        cfg = ws.config_path
+        if cfg.exists():
+            cfg = cfg.open().read().strip()
             print(cfg)
             return cfg
         else:
-            raise NotConfiguredError
+            raise NotConfiguredError('no configuration in this workspace')
 
 
 class clean(Command):
@@ -478,9 +502,9 @@ class clean(Command):
                 except FileNotFoundError:
                     pass
             if args.log:
-                shutil.rmtree(str(ws.log_path))
+                shutil.rmtree(str(ws.log()))
             else:
-                shutil.rmtree(str(ws.checkpoint_path))
+                shutil.rmtree(str(ws.checkpoint()))
 
 
 _app = App()
@@ -507,5 +531,5 @@ def command(*args, **kwargs):
     return get_app().command(*args, **kwargs)
 
 
-__all__ = ['get_app', 'set_global_app', 'workspace',
-           'configurable', 'command', 'arg']
+__all__ = ['get_app', 'set_global_app', 'arg',
+           'workspace', 'configurable', 'command']

@@ -6,6 +6,23 @@ from fret.cli import main
 import py
 import pytest
 
+
+@contextmanager
+def chapp(appdir):
+    _app = get_app()
+    _cwd = os.getcwd()
+    appdir = str(appdir)
+    os.chdir(appdir)
+    app = App()
+    app.import_modules()
+    set_global_app(app)
+    try:
+        yield app
+    finally:
+        set_global_app(_app)
+        os.chdir(_cwd)
+
+
 code1 = '''
 import fret
 
@@ -36,22 +53,28 @@ def test_main(tmpdir: py.path.local):
         app.main(['config', 'Model'])
         model = app.main(['run'])
         assert model.config.x == 3
+
+        app.main(['config', 'Model', '-x', '5', '-y', '10'])
+        model = app.main(['run'])
+        assert model.config.x == 5
+        assert model.config.y == 10
+
         assert app.main(['config']) is not None
+
         app.main(['clean', '-c'])
         with pytest.raises(SystemExit):
             app.main(['run'])
 
+        with pytest.raises(SystemExit):
+            assert app.main(['config']) is None
 
-@contextmanager
-def chapp(appdir):
-    _app = get_app()
-    _cwd = os.getcwd()
-    appdir = str(appdir)
-    app = App()
-    os.chdir(appdir)
-    set_global_app(app)
-    try:
-        yield app
-    finally:
-        set_global_app(_app)
-        os.chdir(_cwd)
+        app.main(['-w', 'ws/model1', 'config', 'Model'])
+        app.main(['-w', 'ws/model2', 'config', 'Model', '-x', '5', '-y', '10'])
+        model = app.main(['-w', 'ws/model1', 'run'])
+        assert model.config.x == 3
+        model = app.main(['-w', 'ws/model2', 'run'])
+        assert model.config.x == 5
+
+    with chapp(appdir.join('ws/model2')) as app:
+        model = app.main(['run'])
+        assert model.config.x == 5

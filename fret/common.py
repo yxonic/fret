@@ -7,7 +7,7 @@ from datetime import datetime
 
 import toml
 
-from .exceptions import NotConfiguredError, NoWorkspaceError, ParseError
+from .exceptions import NotConfiguredError, NoWorkspaceError
 from .util import classproperty, Configuration, optional, stateful
 
 
