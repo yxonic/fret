@@ -309,7 +309,7 @@ class Builder:
 
     def __str__(self):
         cls_name, cfg = self.ws._modules[self._name]
-        return cls_name + '(' + str(cfg) + ')'
+        return cls_name + '(' + str(Configuration(cfg)) + ')'
 
     def __repr__(self):
         return str(self)

@@ -22,23 +22,25 @@ Create a file named `app.py` with content:
 ```python
 import fret
 
-@fret.configurable
-class Model:
-    def __init__(self, x=3, y=4):
-        ...
-        
 @fret.command
 def run(ws):
     model = ws.build()
     print(model)
+
+@fret.configurable
+class Model:
+    def __init__(self, x=3, y=4):
+        ...
 ```
 
 Then under the same directory, you can run: 
 ```sh
 $ fret config Model
+[ws/_default] configured "main" as "Model" with: x=3, y=4
 $ fret run
 Model(x=3, y=4)
 $ fret config Model -x 5 -y 10
+[ws/_default] configured "main" as "Model" with: x=5, y=10
 $ fret run
 Model(x=5, y=10)
 ```
@@ -48,7 +50,9 @@ Model(x=5, y=10)
 You can specify different configuration in different workspace:
 ```sh
 $ fret -w ws/model1 config Model
+[ws/model1] configured "main" as "Model" with: x=3, y=4
 $ fret -w ws/model2 config Model -x 5 -y 10
+[ws/model2] configured "main" as "Model" with: x=5, y=10
 $ fret -w ws/model1 run
 Model(x=3, y=4)
 $ fret -w ws/model2 run
@@ -117,11 +121,15 @@ class A:
 class B:
     def __init__(self, a, bar=3):
         ...
+```
 
->>> a = A()
->>> b = B(a, bar=4)
->>> b
-B(A(foo='bar'), bar=4)
+```sh
+$ fret config a A -foo test
+[ws/_default] configured "a" as "A" with: foo='test'
+$ fret config B
+[ws/_default] configured "main" as "B" with: a='a', bar=3
+$ fret run
+B(A(foo='test'), bar=4)
 ```
 
 ### Inheritance
@@ -136,10 +144,13 @@ class B(A):
     def __init__(self, bar=3, **others):
         super().__init__(**others)
         ...
+```
 
->>> b = B(foo=0, bar=0)
->>> b
-B(foo=0, bar=0, sth=3)
+```sh
+$ fret config B -foo baz -bar 0
+[ws/_default] configured "main" as "B" with: bar=0, foo='baz', sth=3
+$ fret run
+B(bar=0, foo='baz', sth=3)
 ```
 
 ### Internals
@@ -156,7 +167,6 @@ foo='bar'
 - [ ] `@fret.configurable`: parameter checking
 - [x] `fret.App`, global app object
 - [ ] CLI: entry point logic, testing, tagged workspace
-- [ ] Parameter check
 - [ ] Java/GNU style command line args, shorthands, better logic for boolean default value
 - [ ] Global configuration file: `fret.toml`
 - [ ] Documents and examples

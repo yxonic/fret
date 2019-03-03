@@ -240,6 +240,8 @@ class App:
                 if not hasattr(self, 'config'):
                     _cfg = cfg.copy()
                     _cfg.update(kwargs)
+                    if varkw is not None:
+                        del _cfg[varkw]
                     Module.__init__(self, **_cfg)
 
                 if varkw is None:
@@ -458,8 +460,8 @@ class config(Command):
                     m = args.module
                     cfg = {name: value for (name, value) in args._get_kwargs()
                            if name in group_options[m]}
-                    print('[%s] configured "%s" as "%s" with %s' %
-                          (ws, args.name, m, str(cfg)),
+                    print('[%s] configured "%s" as "%s" with: %s' %
+                          (ws, args.name, m, str(Configuration(cfg))),
                           file=sys.stderr)
                     ws.register(args.name, get_app().load_module(m), **cfg)
 
