@@ -6,7 +6,7 @@ with open('README.md') as f:
 
 setup(
     name='fret',
-    version='0.2.0.beta1',
+    version='0.2.0.beta2',
     url='https://github.com/yxonic/fret',
     license='MIT',
     author='yxonic',
