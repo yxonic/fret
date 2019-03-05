@@ -156,7 +156,12 @@ def optional(default, position=1):
     return wrapper
 
 
-def stateful(states):
+def stateful(*states):
+    _cls = None
+    if len(states) == 1 and inspect.isclass(states[0]):
+        _cls = states[0]
+        states = _cls.__slots__
+
     def wrapper(cls):
         def state_dict(self):
             return {s: getattr(self, s) for s in states}
@@ -168,7 +173,11 @@ def stateful(states):
         cls.state_dict = state_dict
         cls.load_state_dict = load_state_dict
         return cls
-    return wrapper
+
+    if _cls is not None:
+        return wrapper(_cls)
+    else:
+        return wrapper
 
 
 _sigint_handler = signal.getsignal(signal.SIGINT)

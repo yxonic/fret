@@ -77,7 +77,7 @@ import time
 import fret
 
 @fret.configurable
-@fret.stateful(['value'])
+@fret.stateful('value')
 class Model:
     def __init__(self):
         self.value = 0
@@ -117,22 +117,22 @@ current epoch: 4, sum: 10, cnt: 5
 ```python
 @fret.configurable
 class A:
-    def __init__(self, foo='bar'):
+    def __init__(self, foo):
         ...
 
-@fret.configurable(submodules=['a'])
+@fret.configurable(submodules=['sub'])
 class B:
-    def __init__(self, a, bar=3):
-        ...
+    def __init__(self, sub, bar=3):
+        self.sub = sub(foo='bar')   # call sub to build submodule
 ```
 
 ```sh
-$ fret config a A -foo test
-[ws/_default] configured "a" as "A" with: foo='test'
+$ fret config sub A
+[ws/_default] configured "sub" as "A"
 $ fret config B
-[ws/_default] configured "main" as "B" with: a='a', bar=3
+[ws/_default] configured "main" as "B" with: sub='sub', bar=3
 $ fret run
-B(A(foo='test'), bar=4)
+B(sub=A(), bar=3)
 ```
 
 ### Inheritance

@@ -246,7 +246,7 @@ class Run:
         return path
 
 
-@stateful(['_sum', '_cnt'])
+@stateful
 class Accumulator:
     __slots__ = ['_sum', '_cnt']
 
@@ -276,7 +276,7 @@ class Accumulator:
         return self._sum / self._cnt if self._cnt > 0 else self._sum
 
 
-@stateful(['start', 'step', 'stop', '_start'])
+@stateful
 class Range:
     __slots__ = ['start', 'step', 'stop', '_start']
 

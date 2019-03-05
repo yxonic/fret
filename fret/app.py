@@ -458,12 +458,15 @@ class config(Command):
             def save(args):
                 with get_app().workspace(args.workspace) as ws:
                     m = args.module
-                    cfg = {name: value for (name, value) in args._get_kwargs()
-                           if name in group_options[m]}
+                    cfg = [(name, value)
+                           for (name, value) in args._get_kwargs()
+                           if name in group_options[m]]
+                    cfg = Configuration(cfg)
                     print('[%s] configured "%s" as "%s" with: %s' %
-                          (ws, args.name, m, str(Configuration(cfg))),
+                          (ws, args.name, m, str(cfg)),
                           file=sys.stderr)
-                    ws.register(args.name, get_app().load_module(m), **cfg)
+                    ws.register(args.name, get_app().load_module(m),
+                                **cfg._dict())
 
             sub.set_defaults(func=save)
 
