@@ -55,10 +55,10 @@ def test_workspace(tmpdir: py.path.local):
         assert file.exists()
 
         with pytest.raises(FileNotFoundError):
-            ws.checkpoint('duck.pt').open()
-        ws.checkpoint('duck.pt').open('w').close()
-        assert os.path.samefile(str(ws.checkpoint('duck.pt')),
-                                str(tmpdir.join('ws/checkpoint/duck.pt')))
+            ws.snapshot('duck.pt').open()
+        ws.snapshot('duck.pt').open('w').close()
+        assert os.path.samefile(str(ws.snapshot('duck.pt')),
+                                str(tmpdir.join('ws/snapshot/duck.pt')))
 
         # test module registering
         ws.register(A(a=1))
@@ -89,7 +89,7 @@ def test_workspace(tmpdir: py.path.local):
     with ws.run('test') as run:
         rid = run.id
         assert rid.startswith('test')
-        assert run.checkpoint().is_dir()
+        assert run.snapshot().is_dir()
         x = run.value(3)
         assert x == 3
         s = run.acc()

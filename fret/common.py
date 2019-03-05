@@ -13,7 +13,7 @@ from .util import classproperty, Configuration, optional, stateful
 
 class Workspace:
     """Workspace utilities. One can save/load configurations, build models
-    with specific configuration, save checkpoints, open results, etc., using
+    with specific configuration, save snapshots, open results, etc., using
     workspace objects."""
 
     def __init__(self, app, path, config=None):
@@ -50,8 +50,8 @@ class Workspace:
         _mkdir(path, not filename or filename[-1].endswith('/'))
         return path
 
-    def checkpoint(self, *filename):
-        path = self.path.joinpath('checkpoint', *filename)
+    def snapshot(self, *filename):
+        path = self.path.joinpath('snapshot', *filename)
         _mkdir(path, not filename or filename[-1].endswith('/'))
         return path
 
@@ -110,16 +110,16 @@ class Workspace:
         env = self._modules
         args = obj.spec._dict() if hasattr(obj, 'spec') else {}
         state = obj.state_dict()
-        if isinstance(tag, str) and '/' not in tag:
-            f = self.checkpoint(name + '.' + tag + '.pt')
+        if isinstance(tag, str) and not tag.endswith('.pt'):
+            f = self.snapshot(name + '.' + tag + '.pt')
         else:
             f = pathlib.Path(tag)
         pickle.dump({'env': env, 'args': args, 'state': state}, f.open('wb'))
 
     @optional('main')
     def load(self, name, tag):
-        if isinstance(tag, str) and '/' not in tag:
-            f = self.checkpoint(name + '.' + tag + '.pt')
+        if isinstance(tag, str) and not tag.endswith('.pt'):
+            f = self.snapshot(name + '.' + tag + '.pt')
         else:
             f = pathlib.Path(tag)
         state = pickle.load(f.open('rb'))
@@ -168,25 +168,25 @@ class Run:
         self._states = {}
         self._index = 0
         if resume:
-            ids = [filename.name for filename in ws.checkpoint().iterdir()
+            ids = [filename.name for filename in ws.snapshot().iterdir()
                    if filename.is_dir() and filename.name.startswith(tag)]
             if ids:
                 self._id = max(ids)  # most recent
         if self._id is None:
             self._id = tag + '-' + datetime.now().strftime("%Y%m%d%H%M%S")
         if not resume:
-            while ws.checkpoint(self._id).exists():
+            while ws.snapshot(self._id).exists():
                 self._id = self._id + '_'
 
     def __enter__(self):
         # load state if possible
-        state_file = self._ws.checkpoint(self._id, '.states.pt')
+        state_file = self._ws.snapshot(self._id, '.states.pt')
         if state_file.exists():
             self._states = pickle.load(state_file.open('rb'))
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        state_file = self._ws.checkpoint(self._id, '.states.pt')
+        state_file = self._ws.snapshot(self._id, '.states.pt')
         for k in self._states:
             if hasattr(self._states[k], 'state_dict'):
                 self._states[k] = self._states[k].state_dict()
@@ -240,8 +240,8 @@ class Run:
         _mkdir(path, not filename or filename[-1].endswith('/'))
         return path
 
-    def checkpoint(self, *filename):
-        path = self._ws.path.joinpath('checkpoint', self._id, *filename)
+    def snapshot(self, *filename):
+        path = self._ws.path.joinpath('snapshot', self._id, *filename)
         _mkdir(path, not filename or filename[-1].endswith('/'))
         return path
 

@@ -509,7 +509,7 @@ class clean(Command):
             if args.log:
                 shutil.rmtree(str(ws.log()))
             else:
-                shutil.rmtree(str(ws.checkpoint()))
+                shutil.rmtree(str(ws.snapshot()))
 
 
 _app = App()
