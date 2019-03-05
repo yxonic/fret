@@ -67,7 +67,37 @@ Model(x=5, y=10)
 ```
 
 ### Save/Load
-[TODO]
+
+```python
+import fret
+
+@fret.command
+def train(ws):
+    model = ws.build()
+    model.train()
+    ws.save(model, 'trained')
+    
+@fret.command
+def test(ws):
+    model = ws.load('ws/best/snapshot/main.trained.pt')
+    print(model.weight)
+    
+@fret.configurable
+@fret.stateful('weight')
+class Model:
+    def __init__(self):
+        self.weight = 0
+    def train(self):
+        self.weight = 23
+```
+
+```sh
+$ fret -w ws/best config Model
+[ws/_default] configured "main" as "Model"
+$ fret -w ws/best train
+$ fret test
+23
+```
 
 ### An Advanced Workflow
 
@@ -171,7 +201,7 @@ foo='bar'
 - [x] `fret.App`, global app object
 - [ ] CLI: entry point logic, testing, tagged workspace
 - [ ] Java/GNU style command line args, shorthands, better logic for boolean default value
-- [ ] Global configuration file: `fret.toml`
+- [ ] `fret.toml`: global configuration, configuration by class name
 - [ ] Documents and examples
 - [ ] `fret new` command with interactive CLI
 - [ ] Other fret commands like show log, check module, etc.

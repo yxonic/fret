@@ -462,9 +462,11 @@ class config(Command):
                            for (name, value) in args._get_kwargs()
                            if name in group_options[m]]
                     cfg = Configuration(cfg)
-                    print('[%s] configured "%s" as "%s" with: %s' %
-                          (ws, args.name, m, str(cfg)),
-                          file=sys.stderr)
+                    msg = '[%s] configured "%s" as "%s"' % \
+                        (ws, args.name, m)
+                    if cfg._config:
+                        msg += ' with: ' + str(cfg)
+                    print(msg, file=sys.stderr)
                     ws.register(args.name, get_app().load_module(m),
                                 **cfg._dict())
 
@@ -493,14 +495,20 @@ class clean(Command):
         parser.add_argument('--all', action='store_true',
                             help='clean the entire workspace')
         parser.add_argument('-c', dest='config', action='store_true',
-                            help='clear workspace configuration')
+                            help='remove workspace configuration')
         parser.add_argument('-l', dest='log', action='store_true',
                             help='clear workspace logs')
+        parser.add_argument('-s', dest='snapshot', action='store_true',
+                            help='clear snapshots')
 
     def run(self, ws, args):
         if args.all:
             shutil.rmtree(str(ws))
         else:
+            if (not args.config and not args.log) or args.snapshot:
+                shutil.rmtree(str(ws.snapshot()))
+            if args.snapshot:
+                shutil.rmtree(str(ws.snapshot()))
             if args.config:
                 try:
                     (ws.path / 'config.toml').unlink()
@@ -508,8 +516,6 @@ class clean(Command):
                     pass
             if args.log:
                 shutil.rmtree(str(ws.log()))
-            else:
-                shutil.rmtree(str(ws.snapshot()))
 
 
 _app = App()

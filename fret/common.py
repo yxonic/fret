@@ -101,17 +101,17 @@ class Workspace:
         # noinspection PyCallingNonCallable
         obj = cls(**cfg)
         obj.ws = self
+        obj.build_name = name
         if kwargs:
             obj.spec = Configuration(kwargs)
         return obj
 
-    @optional('main')
-    def save(self, name, obj, tag):
+    def save(self, obj, tag):
         env = self._modules
         args = obj.spec._dict() if hasattr(obj, 'spec') else {}
         state = obj.state_dict()
         if isinstance(tag, str) and not tag.endswith('.pt'):
-            f = self.snapshot(name + '.' + tag + '.pt')
+            f = self.snapshot(obj.build_name + '.' + tag + '.pt')
         else:
             f = pathlib.Path(tag)
         pickle.dump({'env': env, 'args': args, 'state': state}, f.open('wb'))
@@ -129,7 +129,7 @@ class Workspace:
         return obj
 
     def logger(self, name: str):
-        """Get a logger that logs to a file.
+        """Get a logger that logs to a file under workspace.
 
         Notice that same logger instance is returned for same names.
 
