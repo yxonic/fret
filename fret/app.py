@@ -36,8 +36,9 @@ class App:
                         break
                     p = p.parent
                 else:
-                    path = '.'
+                    path = pathlib.Path().absolute()
 
+        sys.path.insert(0, str(path))
         self._root = pathlib.Path(path)
         self._imp = None
 
@@ -52,7 +53,6 @@ class App:
         self._config = Configuration(cfg)
 
     def import_modules(self):
-        sys.path.insert(0, str(self._root))
         if 'appname' in self._config:
             return importlib.import_module(self._config.appname)
         else:
@@ -61,7 +61,6 @@ class App:
                     return importlib.import_module(appname)
                 except ImportError:
                     pass
-        sys.path.pop(0)
 
     def register_module(self, cls, name=None):
         if name is None:
