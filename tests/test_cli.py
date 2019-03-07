@@ -1,3 +1,4 @@
+import importlib
 import os
 from contextlib import contextmanager
 
@@ -14,8 +15,13 @@ def chapp(appdir):
     appdir = str(appdir)
     os.chdir(appdir)
     app = App()
-    app.import_modules()
     set_global_app(app)
+    imp = app.import_modules()
+    if imp:
+        try:
+            importlib.reload(imp)
+        except (ImportError, AttributeError):
+            pass
     try:
         yield app
     finally:
@@ -75,6 +81,7 @@ def test_main(tmpdir: py.path.local):
         model = app.main(['-w', 'ws/model2', 'run'])
         assert model.config.x == 5
 
+    appdir.join('fret.toml').open('w').close()
     with chapp(appdir.join('ws/model2')) as app:
         model = app.main(['run'])
         assert model.config.x == 5

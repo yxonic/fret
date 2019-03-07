@@ -18,20 +18,6 @@ from .common import Module, Workspace
 from .util import classproperty, Configuration, colored
 
 
-class arg:
-    def __init__(self, *args, **kwargs):
-        self.args = args
-        self.kwargs = kwargs
-
-
-class _ArgumentParser(argparse.ArgumentParser):
-    def error(self, message):
-        # customize error message
-        self.print_usage(sys.stderr)
-        err = colored('error:', 'r', style='b')
-        self.exit(2, '%s %s\n' % (err, message))
-
-
 class App:
     __slots__ = ['_root', '_config', '_commands', '_modules', '_cwd', '_imp']
 
@@ -49,30 +35,9 @@ class App:
                         os.chdir(path)
                         break
                     p = p.parent
-
-            if path is None:
-                # no fret.toml found, search for default app names
-                p = pathlib.Path().absolute()
-                for appname in ['main', 'app']:
-                    if p.joinpath('%s.py' % appname).exists():
-                        path = str(p)
-                        break
                 else:
-                    while p != pathlib.Path(p.root):
-                        for appname in ['main', 'app']:
-                            if p.joinpath('%s.py' % appname).exists():
-                                path = str(p)
-                                self._cwd = os.getcwd()
-                                os.chdir(path)
-                                break
-                        else:
-                            p = p.parent
-                            continue
-                        break
-                    else:
-                        path = '.'
+                    path = '.'
 
-        sys.path.append(path)
         self._root = pathlib.Path(path)
         self._imp = None
 
@@ -87,17 +52,16 @@ class App:
         self._config = Configuration(cfg)
 
     def import_modules(self):
-        if self._imp is not None:
-            importlib.reload(self._imp)
+        sys.path.insert(0, str(self._root))
         if 'appname' in self._config:
-            self._imp = importlib.import_module(self._config.appname)
+            return importlib.import_module(self._config.appname)
         else:
             for appname in ['main', 'app']:
                 try:
-                    self._imp = importlib.import_module(appname)
+                    return importlib.import_module(appname)
                 except ImportError:
-                    continue
-                break  # found main app
+                    pass
+        sys.path.pop(0)
 
     def register_module(self, cls, name=None):
         if name is None:
@@ -394,6 +358,31 @@ class App:
             else:
                 parser.add_argument(*args, default=v, type=type(v),
                                     help='argument %s' % k)
+
+
+class arg:
+    def __init__(self, *args, **kwargs):
+        self.args = args
+        self.kwargs = kwargs
+
+
+class _CliBuilder:
+    def __init__(self, f, omit_first=True):
+        self._func = f
+
+    def cli_args(self):
+        pass
+
+    def call_args(self, *args, **kwargs):
+        pass
+
+
+class _ArgumentParser(argparse.ArgumentParser):
+    def error(self, message):
+        # customize error message
+        self.print_usage(sys.stderr)
+        err = colored('error:', 'r', style='b')
+        self.exit(2, '%s %s\n' % (err, message))
 
 
 class Command(abc.ABC):

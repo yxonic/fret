@@ -60,13 +60,6 @@ $ fret -w ws/model2 run
 Model(x=5, y=10)
 ```
 
-You can ommit `-w <path>` if you are currently under a workspace:
-```sh
-$ cd ws/model2
-$ fret run
-Model(x=5, y=10)
-```
-
 ### Save/Load
 
 ```python
