@@ -119,8 +119,16 @@ def test_main(tmpdir: py.path.local):
 
     with appdir.join('main.py').open('w') as f:
         f.write(code2)
+    with appdir.join('app.py').open('w') as f:
+        f.write(code1)
     with chapp(appdir) as app:
         app.main('-w ws/best config Model'.split())
         app.main(' -w ws/best train'.split())
         model = app.main(['test'])
         assert model.weight == 23
+
+        app.main('--app app config Model'.split())
+        os.environ['FRETAPP'] = 'app'
+        model = app.main('run'.split())
+        del os.environ['FRETAPP']
+        assert model.config.x == 3
