@@ -141,19 +141,47 @@ def colored(fmt, fg=None, bg=None, style=None):
         return fmt
 
 
-def optional(default, position=1):
-    def wrapper(f):
-        spec = inspect.getfullargspec(f)
-        expected_len = len(spec.args)
+def pairwise(l):
+    i = 0
+    while i < len(l):
+        yield l[i], l[i + 1]
+        i += 2
 
+
+def overload(*rules):
+    if len(rules) % 2 != 0:
+        raise ValueError("every guard must have an action.")
+
+    def wrapper(f):
         @functools.wraps(f)
         def new_f(*args, **kwargs):
-            if len(args) == expected_len - 1:
-                args = args[:position] + (default,) + args[position:]
+            for guard, action in pairwise(rules):
+                if match(args, guard):
+                    if action is ...:
+                        break
+                    args = action(*args)
+                    break
+            else:
+                raise ValueError('argument not match any overloads')
             return f(*args, **kwargs)
-
         return new_f
     return wrapper
+
+
+def match(args, rule):
+    if rule is ...:
+        return True
+    if not isinstance(rule, tuple) and not isinstance(rule, list):
+        if isinstance(rule, type):
+            return all(isinstance(x, rule) for x in args)
+        else:
+            return all(x == rule for x in args)
+    if len(args) != len(rule):
+        return False
+    return all(r is ... or
+               (isinstance(r, type) and isinstance(x, r)) or
+               (not isinstance(r, type) and x == r)
+               for x, r in zip(args, rule))
 
 
 def stateful(*states):

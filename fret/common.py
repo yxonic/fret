@@ -8,7 +8,7 @@ from datetime import datetime
 import toml
 
 from .exceptions import NotConfiguredError, NoWorkspaceError
-from .util import classproperty, Configuration, optional, stateful
+from .util import classproperty, Configuration, stateful, overload
 
 
 class Workspace:
@@ -55,7 +55,8 @@ class Workspace:
         _mkdir(path, not filename or filename[-1].endswith('/'))
         return path
 
-    @optional('main')
+    @overload((..., str, ...), ...,
+              (..., ...), lambda self, m: (self, 'main', m))
     def register(self, name, module, **kwargs):
         """Register and save module configuration."""
         if not ins.isclass(module):
@@ -116,7 +117,8 @@ class Workspace:
             f = pathlib.Path(tag)
         pickle.dump({'env': env, 'args': args, 'state': state}, f.open('wb'))
 
-    @optional('main')
+    @overload((..., str, ...), ...,
+              (..., ...), lambda self, t: (self, 'main', t))
     def load(self, name, tag):
         if isinstance(tag, str) and not tag.endswith('.pt'):
             f = self.snapshot(name + '.' + tag + '.pt')
@@ -196,7 +198,8 @@ class Run:
     def id(self):
         return self._id
 
-    @optional(None)
+    @overload((..., str, ...), ...,
+              (..., ...), lambda self, m: (self, None, m))
     def value(self, name, value):
         if name is None:
             name = str(self._index)
@@ -207,7 +210,9 @@ class Run:
             self._states[name] = value
             return value
 
-    @optional(None)
+    @overload((..., str, ...), ...,
+              (..., None, ...), ...,
+              (..., ...), lambda self, m: (self, None, m))
     def register(self, name, obj):
         if name is None:
             name = str(self._index)
@@ -218,16 +223,18 @@ class Run:
         self._states[name] = obj
         return obj
 
-    @optional(None)
+    @overload((..., str), ...,
+              (...,), lambda self: (self, None))
     def acc(self, name):
         return self.register(name, Accumulator())
 
-    def range(self, *args):
-        if not args or not isinstance(args[0], str):
-            name = None
-        else:
-            name = args[0]
-            args = args[1:]
+    @overload((..., str, int), ...,
+              (..., str, int, int), ...,
+              (..., str, int, int, int), ...,
+              (..., int), lambda self, *args: (self, None) + args,
+              (..., int, int), lambda self, *args: (self, None) + args,
+              (..., int, int, int), lambda self, *args: (self, None) + args)
+    def range(self, name, *args):
         return self.register(name, Range(*args))
 
     def log(self, *filename):
