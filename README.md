@@ -191,11 +191,11 @@ foo='bar'
 - [x] `fret.Configuration`: high-level class for configuration
 - [x] `fret.Workspace`: module build/save/load (by tag or by path), persistency
 - [x] `ws.run()` context manager, `run.value()`, `run.acc()`, `run.range()`, `run.register()`
-- [ ] `@fret.configurable`: parameter checking
 - [x] `fret.App`, global app object
-- [ ] CLI: entry point logic, testing, tagged workspace
+- [x] CLI: entry point logic, testing
+- [ ] `@fret.configurable` and `@fret.command` clean-up
+- [ ] `fret.toml`: global configuration, configuration by class name, named workspace
 - [ ] Java/GNU style command line args, shorthands, better logic for boolean default value
-- [ ] `fret.toml`: global configuration, configuration by class name
+- [ ] Full docstring
 - [ ] Documents and examples
-- [ ] `fret new` command with interactive CLI
-- [ ] Other fret commands like show log, check module, etc.
+- [ ] Utility commands like show log, check module, etc.
