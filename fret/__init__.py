@@ -1,6 +1,6 @@
 from .util import nonbreak, stateful
 from .util import colored as _colored
-from .app import workspace, configurable, command, arg
+from .app import workspace, configurable, command, argspec
 
 import logging as _logging
 
@@ -9,6 +9,7 @@ _logger.setLevel(_logging.INFO)
 
 
 class _ColoredFormatter(_logging.Formatter):
+    """"""
     _LOG_COLORS = {
         'WARNING': 'y',
         'INFO': 'g',
@@ -18,6 +19,7 @@ class _ColoredFormatter(_logging.Formatter):
     }
 
     def format(self, record):  # pragma: no cover
+        """"""
         levelname = record.levelname
         if levelname in self._LOG_COLORS:
             record.levelname = _colored(

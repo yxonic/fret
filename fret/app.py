@@ -304,7 +304,7 @@ class App:
             else:
                 args = ['-' + k]
 
-            if isinstance(v, arg):
+            if isinstance(v, argspec):
                 if v.args:
                     parser.add_argument(*v.args, **v.kwargs)
                 else:
@@ -365,8 +365,10 @@ class App:
                                     help='argument %s' % k)
 
 
-class arg:
+class argspec:
     def __init__(self, *args, **kwargs):
+        """In control of the behavior of commands. Represents arguments for
+        ``add_argument`` method of :class:`~argparse.ArgumentParser`."""
         self.args = args
         self.kwargs = kwargs
 
@@ -525,6 +527,7 @@ def set_global_app(app):
 
 
 def workspace(*args, **kwargs):
+    """Build workspace within current app."""
     return get_app().workspace(*args, **kwargs)
 
 
@@ -536,5 +539,5 @@ def command(*args, **kwargs):
     return get_app().command(*args, **kwargs)
 
 
-__all__ = ['get_app', 'set_global_app', 'arg',
+__all__ = ['get_app', 'set_global_app', 'argspec',
            'workspace', 'configurable', 'command']
