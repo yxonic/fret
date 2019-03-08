@@ -4,6 +4,12 @@ from setuptools import setup
 with open('README.md') as f:
     long_description = f.read()
 
+test_deps = [
+    'pytest>=4',
+    'pytest-cov>=2.6.0',
+    'pytest-pep8>=1',
+]
+
 setup(
     name='fret',
     version='0.2.1',
@@ -13,19 +19,15 @@ setup(
     author_email='yxonic@gmail.com',
     description='REProducible Experimental environment.',
     long_description=long_description,
-    long_description_content_type="text/markdown",
     packages=['fret'],
     platforms='any',
     python_requires='>=3.4',
     install_requires=[
         'toml',
     ],
+    tests_require=test_deps,
     extras_require={
-        'dev': [
-            'pytest',
-            'pytest-cov',
-            'pytest-pep8',
-        ],
+        'test': test_deps,
         'docs': [
             'sphinx',
             'sphinx-rtd-theme',
