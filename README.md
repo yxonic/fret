@@ -5,7 +5,7 @@
 [![PyPI](https://img.shields.io/pypi/v/fret.svg)](https://pypi.python.org/pypi/fret)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/fret.svg)](https://pypi.python.org/pypi/fret)
 
-Framework for Reproducible ExperimenTs
+Framework for Reproducible ExperimenTs. Read on for a quick guide. Full documentation [here](https://yxonic.github.io/fret/index.html).
 
 ## Installation
 From pip:
