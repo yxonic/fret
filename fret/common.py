@@ -162,6 +162,8 @@ class Workspace:
 
 
 class Run:
+    """Class designed for running state persistency."""
+
     __slots__ = ['_ws', '_id', '_states', '_index']
 
     def __init__(self, ws, tag, resume):
@@ -255,6 +257,7 @@ class Run:
 
 @stateful
 class Accumulator:
+    """A stateful accumulator."""
     __slots__ = ['_sum', '_cnt']
 
     def __init__(self):
@@ -285,6 +288,7 @@ class Accumulator:
 
 @stateful
 class Range:
+    """A stateful range object that mimics built-in ``range``."""
     __slots__ = ['start', 'step', 'stop', '_start']
 
     def __init__(self, *args):
@@ -304,6 +308,7 @@ class Range:
 
 
 class Builder:
+    """Class for building a specific module, with preset ws configuration."""
     def __init__(self, ws, name):
         self.ws = ws
         self._name = name

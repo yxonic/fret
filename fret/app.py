@@ -19,6 +19,9 @@ from .util import classproperty, Configuration, colored
 
 
 class App:
+    """Application object. In charge of locating suitable app, importing
+    modules, and run commands."""
+
     __slots__ = ['_root', '_config', '_commands', '_modules', '_cwd', '_imp']
 
     def __init__(self, path=None):
@@ -366,9 +369,9 @@ class App:
 
 
 class argspec:
+    """In control of the behavior of commands. Represents arguments for
+    :meth:`argparse.ArgumentParser.add_argument`."""
     def __init__(self, *args, **kwargs):
-        """In control of the behavior of commands. Represents arguments for
-        ``add_argument`` method of :class:`~argparse.ArgumentParser`."""
         self.args = args
         self.kwargs = kwargs
 
@@ -518,10 +521,12 @@ _app = App()
 
 
 def get_app():
+    """Get current global app."""
     return _app
 
 
 def set_global_app(app):
+    """Set current global app."""
     global _app
     _app = app
 
@@ -539,5 +544,5 @@ def command(*args, **kwargs):
     return get_app().command(*args, **kwargs)
 
 
-__all__ = ['get_app', 'set_global_app', 'argspec',
+__all__ = ['get_app', 'set_global_app', 'argspec', 'App',
            'workspace', 'configurable', 'command']

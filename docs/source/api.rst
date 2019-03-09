@@ -2,6 +2,10 @@
 
 API
 ===
+
+Main Functionalities
+--------------------
+
 .. autofunction:: fret.workspace
 
 .. autofunction:: fret.configurable
@@ -11,17 +15,22 @@ API
 .. autoclass:: fret.argspec
 
 
-fret.common
------------
+Common Components
+-----------------
 .. automodule:: fret.common
    :members:
 
-fret.app
---------
+Application Object and CLI
+--------------------------
 .. automodule:: fret.app
    :members:
 
-fret.util
+
+.. automodule:: fret.cli
+   :members:
+
+
+Utilities
 ---------
 .. automodule:: fret.util
    :members:

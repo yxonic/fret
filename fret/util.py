@@ -7,9 +7,9 @@ from collections import OrderedDict
 
 
 class Configuration:
+    """Easy to construct, use and read configuration class."""
     __slots__ = '_config'
 
-    """Easy to construct, use and read configuration class."""
     def __init__(self, *args, **kwargs):
         self._config = OrderedDict(*args, **kwargs)
 
@@ -60,6 +60,7 @@ class Configuration:
 
 
 class classproperty(object):
+    """Class property decorator."""
     __slots__ = '_f'
 
     def __init__(self, f):
@@ -74,25 +75,25 @@ def colored(fmt, fg=None, bg=None, style=None):
     Return colored string.
 
     List of colours (for fg and bg):
-        k   black
-        r   red
-        g   green
-        y   yellow
-        b   blue
-        m   magenta
-        c   cyan
-        w   white
+        k:   black
+        r:   red
+        g:   green
+        y:   yellow
+        b:   blue
+        m:   magenta
+        c:   cyan
+        w:   white
 
     List of styles:
-        b   bold
-        i   italic
-        u   underline
-        s   strike through
-        x   blinking
-        r   reverse
-        y   fast blinking
-        f   faint
-        h   hide
+        b:   bold
+        i:   italic
+        u:   underline
+        s:   strike through
+        x:   blinking
+        r:   reverse
+        y:   fast blinking
+        f:   faint
+        h:   hide
 
     Args:
         fmt (str): string to be colored
@@ -141,7 +142,7 @@ def colored(fmt, fg=None, bg=None, style=None):
         return fmt
 
 
-def pairwise(l):
+def _pairwise(l):
     i = 0
     while i < len(l):
         yield l[i], l[i + 1]
@@ -149,13 +150,14 @@ def pairwise(l):
 
 
 def overload(*rules):
+    """Decorator for defining function overloads."""
     if len(rules) % 2 != 0:
         raise ValueError("every guard must have an action.")
 
     def wrapper(f):
         @functools.wraps(f)
         def new_f(*args, **kwargs):
-            for guard, action in pairwise(rules):
+            for guard, action in _pairwise(rules):
                 if match(args, guard):
                     if action is ...:
                         break
@@ -169,6 +171,7 @@ def overload(*rules):
 
 
 def match(args, rule):
+    """Simple pattern matching."""
     if rule is ...:
         return True
     if not isinstance(rule, tuple) and not isinstance(rule, list):
@@ -185,6 +188,7 @@ def match(args, rule):
 
 
 def stateful(*states):
+    """Decorator for building stateful classes."""
     _cls = None
     if len(states) == 1 and inspect.isclass(states[0]):
         _cls = states[0]
@@ -212,6 +216,7 @@ _sigint_handler = signal.getsignal(signal.SIGINT)
 
 
 def nonbreak(f=None):  # pragma: no cover
+    """Make sure a loop is not interrupted in between an iteration."""
     if f is not None:
         it = iter(f)
     else:
