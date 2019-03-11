@@ -372,19 +372,47 @@ class argspec:
     """In control of the behavior of commands. Represents arguments for
     :meth:`argparse.ArgumentParser.add_argument`."""
     def __init__(self, *args, **kwargs):
-        self.args = args
-        self.kwargs = kwargs
+        self._args = args
+        self._kwargs = kwargs
 
-
-class _CliBuilder:
-    def __init__(self, f, omit_first=True):
-        self._func = f
-
-    def cli_args(self):
+    def default(self):
         pass
 
-    def call_args(self, *args, **kwargs):
+    def required(self):
         pass
+
+    def spec(self):
+        return self._args, self._kwargs
+
+
+class ParserBuilder:
+    def __init__(self, parser, style='gnu'):
+        self._parser = parser
+        self._style = style
+        self._names = []
+        self._spec = []
+
+    def add_opt(self, name, spec):
+        self._names.append(name)
+        self._spec.append(spec)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        prefix = '--' if self._style =='gnu' else '-'
+        seen = set(self._names)
+        for name, spec in zip(self._names, self._spec):
+            args, kwargs = spec.spec()
+            if not args:
+                args = [prefix + name]
+                short = ''.join(seg[0] for seg in name.split('_'))
+                if short not in seen:
+                    args.append('-' + short)
+                    seen.add(short)
+            else:
+                kwargs['dest'] = name
+            self._parser.add_argument(*args, **kwargs)
 
 
 class _ArgumentParser(argparse.ArgumentParser):
