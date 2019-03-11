@@ -400,7 +400,7 @@ class ParserBuilder:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        prefix = '--' if self._style =='gnu' else '-'
+        prefix = '--' if self._style == 'gnu' else '-'
         seen = set(self._names)
         for name, spec in zip(self._names, self._spec):
             args, kwargs = spec.spec()
