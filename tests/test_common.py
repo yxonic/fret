@@ -1,10 +1,13 @@
 import os
+from functools import partial
 
 import py
 import pytest
 
 import fret
+import fret.common
 import fret.util
+import fret.exceptions
 
 
 # noinspection PyUnusedLocal
@@ -25,11 +28,22 @@ class B(A):
 @fret.configurable(submodules=['sub'])
 class C:
     def __init__(self, sub, c):
-        self.b = sub()
+        self.sub = sub()
+        assert sub.help
+
+
+# noinspection PyUnusedLocal
+@fret.configurable(submodules=['sub'], initialize_subs=True)
+class D:
+    def __init__(self, sub):
+        self.sub = sub
+        assert sub.config
 
 
 def test_module():
-    pass
+    c = D(A())
+    with pytest.raises(fret.exceptions.NoWorkspaceError):
+        _ = c.ws
 
 
 def test_workspace(tmpdir: py.path.local):
@@ -64,31 +78,46 @@ def test_workspace(tmpdir: py.path.local):
         ws.register(A(a=1))
 
         ws.register('sub', B, b=2)
+
+        ws.register(D)
+        model = ws.build()
+        assert model.sub.config.b == 2
+
         ws.register(C)
 
         with pytest.raises(TypeError):
             ws.build()
 
         main = ws.build(c=3)  # env: a=1, b=2; build spec: c=3
+        assert main.ws == ws
         ws.save(main, 'tag1')
 
         ws.register('sub', B, b=4)
-        ws.save(main, 'tag2')
+        ws.save(main, str(tmpdir.join('tag2.pt')))
 
         main_ = ws.load('tag1')
-        assert main_.b.config == main.b.config
-        main_ = ws.load('tag2')
-        assert main_.b.config.b == 4
+        assert main_.sub.config == main.sub.config
+        main_ = ws.load(str(tmpdir.join('tag2.pt')))
+        assert main_.sub.config.b == 4
+
+        logger = ws.logger('foo')
+        logger.warning('test log')
+        assert ws.log('foo.log').exists()
+        assert 'test log' in ws.log('foo.log').open().read()
 
     # same ws configuration -> same build behavior
     ws = fret.workspace(str(tmpdir.join('ws')))
     main_ = ws.build(c=3)
-    assert main_.b.config.b == 4
+    assert main_.sub.config.b == 4
+    logger_ = ws.logger('foo')
+    assert logger == logger_
 
     # persistency: ws.run context manager
     with ws.run('test') as run:
         rid = run.id
         assert rid.startswith('test')
+        assert run.log().is_dir()
+        assert run.result().is_dir()
         assert run.snapshot().is_dir()
         x = run.value(3)
         assert x == 3

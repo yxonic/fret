@@ -160,7 +160,8 @@ class App:
             sys.stderr.write(traceback.format_exc())
             logger.error('exception occurred: %s', e)
 
-    def configurable(self, wraps=None, submodules=None, states=None):
+    def configurable(self, wraps=None, submodules=None, states=None,
+                     initialize_subs=False):
         def wrapper(cls):
             orig_init = cls.__init__
             positional, config, varkw = self._get_args(orig_init)
@@ -230,6 +231,7 @@ class App:
             setattr(cls, 'add_arguments', add_arguments)
             setattr(cls, 'state_dict', state_dict)
             setattr(cls, 'load_state_dict', load_state_dict)
+            setattr(cls, '_init_subs', initialize_subs)
 
             if not cls.__name__.startswith('_'):
                 self.register_module(cls)

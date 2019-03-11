@@ -97,7 +97,10 @@ class Workspace:
 
         for sub in cls.submodules:
             if sub not in cfg or isinstance(cfg[sub], str):
-                cfg[sub] = Builder(self, cfg.get(sub) or sub)
+                if cls._init_subs:
+                    cfg[sub] = self.build(cfg.get(sub) or sub)
+                else:
+                    cfg[sub] = Builder(self, cfg.get(sub) or sub)
 
         # noinspection PyCallingNonCallable
         obj = cls(**cfg)
@@ -327,9 +330,9 @@ class Builder:
         return str(self)
 
     def __getattr__(self, item):
-        cls_name, cfg = self.ws.get_module(self._name)[0]
+        cls_name, cfg = self.ws._try_get_module(self._name)
         try:
-            cls = self.ws.app.load_module(cls_name)
+            cls = self.ws._app.load_module(cls_name)
         except KeyError:
             raise KeyError('definition of module %s not found', cls_name)
         return getattr(cls, item)
