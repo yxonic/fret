@@ -4,6 +4,7 @@
 [![Coveralls github](https://img.shields.io/coveralls/github/yxonic/fret.svg)](https://coveralls.io/github/yxonic/fret?branch=master)
 [![PyPI](https://img.shields.io/pypi/v/fret.svg)](https://pypi.python.org/pypi/fret)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/fret.svg)](https://pypi.python.org/pypi/fret)
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/ff562ae2605d4f8da891cfd943de19e4)](https://www.codacy.com/app/yxonic/fret?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=yxonic/fret&amp;utm_campaign=Badge_Grade)
 
 Framework for Reproducible ExperimenTs. Read on for a quick guide. Full documentation [here](https://yxonic.github.io/fret/index.html).
 
@@ -188,15 +189,15 @@ foo='bar'
 ```
 
 ## TODO
-- [x] `fret.Configuration`: high-level class for configuration
-- [x] `fret.Workspace`: module build/save/load (by tag or by path), persistency
-- [x] `ws.run()` context manager, `run.value()`, `run.acc()`, `run.range()`, `run.register()`
-- [x] `fret.App`, global app object
-- [x] CLI: entry point logic, testing
-- [ ] `@fret.configurable` and `@fret.command` clean-up
-- [ ] `fret.toml`: global configuration, configuration by class name, named workspace
-- [ ] Java/GNU style command line args, shorthands, better logic for boolean default value
-- [ ] Full docstring
-- [ ] Documents and examples
-- [ ] Utility commands like show log, check module, etc.
-- [ ] Get version from `__init__.py`.
+- [x]   `fret.Configuration`: high-level class for configuration
+- [x]   `fret.Workspace`: module build/save/load (by tag or by path), persistency
+- [x]   `ws.run()` context manager, `run.value()`, `run.acc()`, `run.range()`, `run.register()`
+- [x]   `fret.App`, global app object
+- [x]   CLI: entry point logic, testing
+- [ ]   `@fret.configurable` and `@fret.command` clean-up
+- [ ]   `fret.toml`: global configuration, configuration by class name, named workspace
+- [ ]   Java/GNU style command line args, shorthands, better logic for boolean default value
+- [ ]   Full docstring
+- [ ]   Documents and examples
+- [ ]   Utility commands like show log, check module, etc.
+- [ ]   Get version from `__init__.py`.
