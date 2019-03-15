@@ -37,7 +37,8 @@ import fret
 
 @fret.configurable
 class Model:
-    def __init__(self, x=3, y=4):
+    def __init__(self, x=(3, 'x'),
+                 y=fret.argspec(default=4, type=int)):
         ...
 
 @fret.command

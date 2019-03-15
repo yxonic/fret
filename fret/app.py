@@ -193,37 +193,33 @@ class App:
                     for name, spec in opt:
                         builder.add_opt(name, spec)
 
-            def new_init(self, *args, **kwargs):
+            def new_init(sf, *args, **kwargs):
                 # get config from signature
                 allowed_args = set(positional[1:]) | set(x[0] for x in opt)
-                cfg = ins.getcallargs(orig_init, self, *args,
+                cfg = ins.getcallargs(orig_init, sf, *args,
                                       **{_k: _v for _k, _v in kwargs.items()
                                          if _k in allowed_args})
                 del cfg['self']
 
-                defaults = {k: v.default() for k, v in opt}
-                for k in defaults:
-                    v = cfg[k]
-                    if v != defaults[k]:
+                defaults = {_k: _v for _k, _v in opt}
+                for name in defaults:
+                    value = cfg[name]
+                    if value != defaults[name]._params:
                         continue
-                    if isinstance(v, tuple):
-                        if isinstance(v[0], tuple):
-                            cfg[k] = {k_: v_ for k_, v_ in v}.get('default')
-                        else:
-                            cfg[k] = v[0]
+                    cfg[name] = defaults[name].default()
 
-                if not hasattr(self, 'config'):
+                if not hasattr(sf, 'config'):
                     _cfg = cfg.copy()
                     _cfg.update(kwargs)
                     if varkw is not None:
                         del _cfg[varkw]
-                    Module.__init__(self, **_cfg)
+                    Module.__init__(sf, **_cfg)
 
                 if varkw is None:
-                    orig_init(self, **cfg)
+                    orig_init(sf, **cfg)
                 else:
                     cfg.update(kwargs)
-                    orig_init(self, **cfg)
+                    orig_init(sf, **cfg)
 
             # inherit Module methods
             for k, v in Module.__dict__.items():
@@ -288,11 +284,12 @@ class argspec:
     """In control of the behavior of commands. Represents arguments for
     :meth:`argparse.ArgumentParser.add_argument`."""
 
-    __slots__ = ['_args', '_kwargs']
+    __slots__ = ['_args', '_kwargs', '_params']
 
     def __init__(self, *args, **kwargs):
         self._args = args
         self._kwargs = kwargs
+        self._params = None
 
     @classmethod
     def from_param(cls, param):
@@ -322,7 +319,9 @@ class argspec:
         elif kwargs['default'] is not None:
             kwargs['type'] = type(kwargs['default'])
 
-        return cls(**kwargs)
+        obj = cls(**kwargs)
+        obj._params = param
+        return obj
 
     def default(self):
         return self._kwargs.get('default') or None
