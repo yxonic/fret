@@ -164,7 +164,7 @@ class App:
                      initialize_subs=False):
         def wrapper(cls):
             orig_init = cls.__init__
-            positional, config, varkw = self._get_args(orig_init)
+            positional, opt, varkw = _get_args(orig_init)
             if submodules is not None:
                 setattr(cls, 'submodules', submodules)
 
@@ -172,34 +172,36 @@ class App:
             orig_load_state_dict = getattr(cls, 'load_state_dict',
                                            lambda *_: None)
 
-            def state_dict(self):
+            def state_dict(sf):
                 if states:
-                    d = {k: getattr(self, k) for k in states}
+                    d = {k: getattr(sf, s) for s in states}
                 else:
                     d = {}
-                d.update(orig_state_dict(self))
+                d.update(orig_state_dict(sf))
                 return d
 
-            def load_state_dict(self, state):
+            def load_state_dict(sf, state):
                 if states:
-                    for k in states:
-                        setattr(self, k, state[k])
-                        del state[k]
-                orig_load_state_dict(self, state)
+                    for s in states:
+                        setattr(sf, s, state[s])
+                        del state[s]
+                orig_load_state_dict(sf, state)
 
             @classmethod
             def add_arguments(_, parser):
-                self._add_arguments_by_kwargs(parser, config)
+                with ParserBuilder(parser) as builder:
+                    for name, spec in opt:
+                        builder.add_opt(name, spec)
 
             def new_init(self, *args, **kwargs):
                 # get config from signature
-                allowed_args = set(positional[1:]) | set(x[0] for x in config)
+                allowed_args = set(positional[1:]) | set(x[0] for x in opt)
                 cfg = ins.getcallargs(orig_init, self, *args,
-                                      **{k: v for k, v in kwargs.items()
-                                         if k in allowed_args})
+                                      **{_k: _v for _k, _v in kwargs.items()
+                                         if _k in allowed_args})
                 del cfg['self']
 
-                defaults = {k: v for k, v in config}
+                defaults = {k: v.default() for k, v in opt}
                 for k in defaults:
                     v = cfg[k]
                     if v != defaults[k]:
@@ -243,29 +245,24 @@ class App:
             return wrapper(wraps)
 
     def command(self, f):
-        _args, config, _ = self._get_args(f)
+        positional, opt, _ = _get_args(f)
 
         @functools.wraps(f)
         def new_f(*args, **kwargs):
-            cfg = {}
-            for k, v in config:
-                if isinstance(v, tuple):
-                    cfg[k] = v[0]
-                else:
-                    cfg[k] = v
+            cfg = {k: v.default() for k, v in opt}
             cfg.update(kwargs)
-            f_args = {k: v for k, v in zip(_args[1:], args[1:])}
+            f_args = {k: v for k, v in zip(positional[1:], args[1:])}
             f_args.update(cfg)
-            # TODO: make an util class for this
-            new_f.args = namedtuple(f.__name__, f_args.keys())(
-                *f_args.values())
+            new_f.args = Configuration(**f_args)
             return f(*args, **cfg)
 
         class Cmd(Command):
             def __init__(self, _app, parser):
-                for arg in _args[1:]:
+                for arg in positional[1:]:
                     parser.add_argument('-' + arg)
-                App._add_arguments_by_kwargs(parser, config)
+                with ParserBuilder(parser) as builder:
+                    for k, v in opt:
+                        builder.add_opt(k, v)
 
             def run(self, ws, args):
                 return new_f(ws, **args._asdict())
@@ -275,126 +272,77 @@ class App:
 
         return new_f
 
-    @staticmethod
-    def _get_args(f):
-        spec = ins.getfullargspec(f)
-        n_config = len(spec.defaults) if spec.defaults else 0
-        args = spec.args if n_config == 0 else spec.args[:-n_config]
-        kwargs = [] if n_config == 0 else \
-            [(k, v) for k, v in zip(spec.args[-n_config:], spec.defaults)]
-        return args, kwargs, spec.varkw
 
-    @staticmethod
-    def _add_arguments_by_kwargs(parser, config):
-        abbrs = set()
-        for k, v in config:
-            # TODO: add arg style (java/gnu), better logic
-            if isinstance(k, str) and k.startswith('_'):
-                continue
-
-            if '_' in k:
-                parts = k.split('_')
-                abbr = ''.join(p[:1] for p in parts)
-            elif len(k) > 1:
-                i = 1
-                while k[:i] in abbrs and i < len(k):
-                    i += 1
-                abbr = k[:i]
-            else:
-                abbr = None
-
-            if abbr is not None and abbr not in abbrs:
-                abbrs.add(abbr)
-                args = ['-' + k, '-' + abbr]
-            else:
-                args = ['-' + k]
-
-            if isinstance(v, argspec):
-                if v.args:
-                    parser.add_argument(*v.args, **v.kwargs)
-                else:
-                    parser.add_argument(*args, **v.kwargs)
-                continue
-
-            if isinstance(v, tuple):
-                if len(v) > 0 and isinstance(v[0], tuple):
-                    # kwargs for parser.add_argument
-                    v = {x: y for x, y in v}
-                else:
-                    # just default value and help
-                    if isinstance(v[0], bool):
-                        if v[0]:
-                            nv = {
-                                'action': 'store_false',
-                                'help': v[1],
-                                'dest': k
-
-                            }
-                            args[0] = '-no' + k
-                        else:
-                            nv = {
-                                'action': 'store_true',
-                                'help': v[1]
-                            }
-                    elif isinstance(v[0], list):
-                        nv = {
-                            'default': v[0],
-                            'help': v[1],
-                            'nargs': '+' if v[0] else '*',
-                            'type': type(v[0][0]) if v[0] else str
-                        }
-                    else:
-                        nv = {
-                            'default': v[0],
-                            'type': type(v[0]),
-                            'help': v[1]
-                        } if v[0] is not None else {
-                            'help': v[1]
-                        }
-                    if len(v) > 2:
-                        nv['choices'] = v[2]
-                    v = nv
-                parser.add_argument(*args, **v)
-            elif isinstance(v, bool):
-                if v:
-                    args[0] = '-no' + k
-                    parser.add_argument(*args, action='store_false',
-                                        help='argument %s' % k, dest=k)
-                else:
-                    parser.add_argument(*args, action='store_true',
-                                        help='argument %s' % k)
-            elif v is None:
-                parser.add_argument(*args, help='argument %s' % k)
-            else:
-                parser.add_argument(*args, default=v, type=type(v),
-                                    help='argument %s' % k)
+def _get_args(f):
+    spec = ins.getfullargspec(f)
+    n_config = len(spec.defaults) if spec.defaults else 0
+    args = spec.args if n_config == 0 else spec.args[:-n_config]
+    defaults = [v if isinstance(v, argspec) else argspec.from_param(v)
+                for v in spec.defaults] if spec.defaults else []
+    kwargs = [] if n_config == 0 else \
+        [(k, v) for k, v in zip(spec.args[-n_config:], defaults)]
+    return args, kwargs, spec.varkw
 
 
 class argspec:
     """In control of the behavior of commands. Represents arguments for
     :meth:`argparse.ArgumentParser.add_argument`."""
+
+    __slots__ = ['_args', '_kwargs']
+
     def __init__(self, *args, **kwargs):
         self._args = args
         self._kwargs = kwargs
 
-    def default(self):
-        pass
+    @classmethod
+    def from_param(cls, param):
+        kwargs = dict()
 
-    def required(self):
-        pass
+        if isinstance(param, tuple):
+            assert len(param) == 2 or len(param) == 3, \
+                'should be default, help[, choices]'
+            kwargs['default'] = param[0]
+            kwargs['help'] = param[1]
+            if len(param) == 3:
+                kwargs['choices'] = param[2]
+        elif param is not None:
+            kwargs['default'] = param
+
+        if isinstance(kwargs['default'], list):
+            if kwargs['default']:
+                kwargs['nargs'] = '+'
+                kwargs['type'] = type(kwargs['default'][0])
+            else:
+                kwargs['nargs'] = '*'
+        elif isinstance(kwargs['default'], bool):
+            if kwargs['default']:
+                kwargs['action'] = 'store_false'
+            else:
+                kwargs['action'] = 'store_true'
+        elif kwargs['default'] is not None:
+            kwargs['type'] = type(kwargs['default'])
+
+        return cls(**kwargs)
+
+    def default(self):
+        return self._kwargs.get('default') or None
 
     def spec(self):
         return self._args, self._kwargs
 
 
 class ParserBuilder:
-    def __init__(self, parser, style='gnu'):
+    def __init__(self, parser, style='java'):
         self._parser = parser
         self._style = style
         self._names = []
         self._spec = []
 
     def add_opt(self, name, spec):
+        if spec.default() is True:
+            # change name for better bool support
+            spec._kwargs['dest'] = name
+            name = 'no_' + name
         self._names.append(name)
         self._spec.append(spec)
 
@@ -402,7 +350,7 @@ class ParserBuilder:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        prefix = '--' if self._style == 'gnu' else '-'
+        prefix = '-' if self._style == 'java' else '--'
         seen = set(self._names)
         for name, spec in zip(self._names, self._spec):
             args, kwargs = spec.spec()
@@ -414,6 +362,8 @@ class ParserBuilder:
                     seen.add(short)
             else:
                 kwargs['dest'] = name
+            if 'help' not in kwargs:
+                kwargs['help'] = 'parameter ' + name
             self._parser.add_argument(*args, **kwargs)
 
 

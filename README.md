@@ -199,3 +199,4 @@ foo='bar'
 - [ ] Full docstring
 - [ ] Documents and examples
 - [ ] Utility commands like show log, check module, etc.
+- [ ] Get version from `__init__.py`.
