@@ -58,15 +58,19 @@ class App:
     def import_modules(self, appname=None):
         appname = appname or os.environ.get('FRETAPP')
         if appname is not None:
-            return importlib.import_module(appname)
-        if 'appname' in self._config:
-            return importlib.import_module(self._config.appname)
+            self._imp = importlib.import_module(appname)
+        elif 'appname' in self._config:
+            self._imp = importlib.import_module(self._config.appname)
         else:
             for appname in ['main', 'app']:
                 try:
-                    return importlib.import_module(appname)
+                    self._imp = importlib.import_module(appname)
+                    break
                 except ImportError:
                     pass
+            else:
+                logging.warning('no app found')
+        return self._imp
 
     def register_module(self, cls, name=None):
         if name is None:

@@ -10,7 +10,7 @@ import pytest
 
 
 @contextmanager
-def chapp(appdir):
+def chapp(appdir, imp=True):
     _app = get_app()
     _cwd = os.getcwd()
     _path = sys.path.copy()
@@ -18,12 +18,13 @@ def chapp(appdir):
     os.chdir(appdir)
     app = App()
     set_global_app(app)
-    imp = app.import_modules()
     if imp:
-        try:
-            importlib.reload(imp)
-        except (ImportError, AttributeError):
-            pass
+        imp = app.import_modules()
+        if imp:
+            try:
+                importlib.reload(imp)
+            except (ImportError, AttributeError):
+                pass
     try:
         yield app
     finally:
@@ -73,9 +74,11 @@ class Model:
 '''
 
 
-def test_main(tmpdir: py.path.local):
+def test_main(tmpdir: py.path.local, caplog):
     with pytest.raises(SystemExit):
         main()
+
+    assert caplog.text.count('no app found') == 1
 
     appdir = tmpdir.join('appdir1')
     appdir.mkdir()
