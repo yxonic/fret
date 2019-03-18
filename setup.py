@@ -12,7 +12,7 @@ test_deps = [
 
 setup(
     name='fret',
-    version='0.2.1',
+    version='0.2.2',
     url='https://github.com/yxonic/fret',
     license='MIT',
     author='yxonic',
