@@ -13,6 +13,14 @@ test_deps = [
     'pytest-cov>=2.6.0',
     'pytest-pep8>=1',
 ]
+doc_deps = [
+    'sphinx',
+    'sphinx-rtd-theme'
+]
+dev_deps = test_deps + doc_deps + [
+    'setuptools>=40',
+    'wheel'
+]
 
 setup(
     name='fret',
@@ -33,10 +41,8 @@ setup(
     tests_require=test_deps,
     extras_require={
         'test': test_deps,
-        'docs': [
-            'sphinx',
-            'sphinx-rtd-theme',
-        ]
+        'doc': doc_deps,
+        'dev': dev_deps
     },
     entry_points={
         'console_scripts': [
