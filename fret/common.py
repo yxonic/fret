@@ -330,7 +330,7 @@ class Builder:
         return str(self)
 
     def __getattr__(self, item):
-        cls_name, cfg = self.ws._try_get_module(self._name)
+        cls_name, _ = self.ws._try_get_module(self._name)
         try:
             cls = self.ws._app.load_module(cls_name)
         except KeyError:
