@@ -2,7 +2,6 @@
 
 [![Travis (.org)](https://img.shields.io/travis/yxonic/fret.svg)](https://travis-ci.org/yxonic/fret)
 [![Coveralls github](https://img.shields.io/coveralls/github/yxonic/fret.svg)](https://coveralls.io/github/yxonic/fret?branch=master)
-[![Codacy Badge](https://api.codacy.com/project/badge/Grade/ff562ae2605d4f8da891cfd943de19e4)](https://www.codacy.com/app/yxonic/fret?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=yxonic/fret&amp;utm_campaign=Badge_Grade)
 [![PyPI](https://img.shields.io/pypi/v/fret.svg)](https://pypi.python.org/pypi/fret)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/fret.svg)](https://pypi.python.org/pypi/fret)
 

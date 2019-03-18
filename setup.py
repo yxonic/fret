@@ -12,13 +12,14 @@ test_deps = [
 
 setup(
     name='fret',
-    version='0.2.2',
+    version='0.2.2.post1',
     url='https://github.com/yxonic/fret',
     license='MIT',
     author='yxonic',
     author_email='yxonic@gmail.com',
     description='REProducible Experimental environment.',
     long_description=long_description,
+    long_description_content_type='text/markdown',
     packages=['fret'],
     platforms='any',
     python_requires='>=3.4',
