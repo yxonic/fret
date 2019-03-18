@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 from setuptools import setup
+import re
 
-import fret
-version = fret.__version__
+with open('fret/__init__.py') as f:
+    version = re.search(r'__version__ = \'(.+)\'', f.read()).group(1)
 
 with open('README.md') as f:
     long_description = f.read()
