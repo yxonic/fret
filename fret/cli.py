@@ -8,7 +8,9 @@ def main(args=None):
         args (list): command line arguments. If None, get args from
                      :data:`sys.argv` (default: ``None``)
     """
-    return get_app().main(args)
+    app = get_app()
+    app.import_modules()
+    return app.main(args)
 
 
 if __name__ == '__main__':
