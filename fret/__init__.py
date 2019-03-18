@@ -37,3 +37,5 @@ _log_formatter = _ColoredFormatter(
 _console_handler = _logging.StreamHandler()
 _console_handler.setFormatter(_log_formatter)
 _logger.addHandler(_console_handler)
+
+__version__ = '0.2.2.post1'

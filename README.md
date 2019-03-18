@@ -9,7 +9,6 @@ Framework for Reproducible ExperimenTs. Read on for a quick guide. Full document
 
 ## Installation
 From pip:
-
 ```sh
 pip install fret
 ```
@@ -21,7 +20,6 @@ From source: clone the repository and then run: `python setup.py install`.
 ### Basic Usage
 
 Create a file named `app.py` with content:
-
 ```python
 import fret
 
@@ -37,7 +35,6 @@ class Model:
 ```
 
 Then under the same directory, you can run: 
-
 ```sh
 $ fret config Model
 [ws/_default] configured "main" as "Model" with: x=3, y=4
@@ -52,7 +49,6 @@ Model(x=5, y=10)
 ### Using Workspace
 
 You can specify different configuration in different workspace:
-
 ```sh
 $ fret -w ws/model1 config Model
 [ws/model1] configured "main" as "Model" with: x=3, y=4
@@ -100,7 +96,6 @@ $ fret test
 ### An Advanced Workflow
 
 In `app.py`:
-
 ```python
 import time
 import fret
@@ -127,7 +122,6 @@ def resumable(ws):
 ```
 
 Then you can stop and restart this program anytime, with consistent results:
-
 ```sh
 $ fret resumable
 current epoch: 0, sum: 0, cnt: 1

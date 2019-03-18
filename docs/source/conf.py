@@ -25,10 +25,9 @@ project = 'fret'
 copyright = '2019, yxonic'
 author = 'yxonic'
 
-# The short X.Y version
-version = '0.2.1'
-# The full version, including alpha/beta/rc tags
-release = '0.2.1'
+import fret
+version = fret.__version__
+release = version
 
 
 # -- General configuration ---------------------------------------------------

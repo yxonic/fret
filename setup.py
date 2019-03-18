@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 from setuptools import setup
 
+import fret
+version = fret.__version__
+
 with open('README.md') as f:
     long_description = f.read()
 
@@ -12,7 +15,7 @@ test_deps = [
 
 setup(
     name='fret',
-    version='0.2.2.post1',
+    version=version,
     url='https://github.com/yxonic/fret',
     license='MIT',
     author='yxonic',
