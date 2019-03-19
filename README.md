@@ -77,8 +77,7 @@ def test(ws):
     model = ws.load('ws/best/snapshot/main.trained.pt')
     print(model.weight)
     
-@fret.configurable
-@fret.stateful('weight')
+@fret.configurable(states=['weight'])
 class Model:
     def __init__(self):
         self.weight = 0
@@ -101,8 +100,7 @@ In `app.py`:
 import time
 import fret
 
-@fret.configurable
-@fret.stateful('value')
+@fret.configurable(states=['value'])
 class Model:
     def __init__(self):
         self.value = 0
