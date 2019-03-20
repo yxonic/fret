@@ -15,7 +15,8 @@ import toml
 
 from .exceptions import NotConfiguredError
 from .common import Module, Workspace
-from .util import classproperty, Configuration, colored
+# noinspection PyShadowingBuiltins
+from .util import classproperty, Configuration, colored, _dict as dict
 
 
 class App:
@@ -46,13 +47,13 @@ class App:
         self._imp = None
 
         self._config = None
-        self._commands = {}
-        self._modules = {}
+        self._commands = dict()
+        self._modules = dict()
 
         if self._root.joinpath('fret.toml').exists():
             cfg = toml.load(self._root.joinpath('fret.toml').open())
         else:
-            cfg = {}
+            cfg = dict()
         self._config = Configuration(cfg)
 
     def import_modules(self, appname=None):
@@ -119,7 +120,7 @@ class App:
                                                  dest='command')
         _subparsers.required = True
 
-        subparsers = {}
+        subparsers = dict()
         for _cmd, _cls in self._commands.items():
             _sub = _subparsers.add_parser(
                 _cmd, help=_cls.help,
@@ -149,16 +150,16 @@ class App:
         logger = logging.getLogger(args.command)
         try:
             return args.func(args)
-        except KeyboardInterrupt:  # pragma: no cover
+        except KeyboardInterrupt:
             # print traceback info to screen only
             import traceback
             sys.stderr.write(traceback.format_exc())
             logger.warning('cancelled by user')
-        except NotConfiguredError as e:  # pragma: no cover
+        except NotConfiguredError as e:
             print('error:', e)
             subparsers['config'].print_usage()
             sys.exit(1)
-        except Exception as e:  # pragma: no cover
+        except Exception as e:
             # print traceback info to screen only
             import traceback
             sys.stderr.write(traceback.format_exc())
@@ -172,7 +173,7 @@ class App:
             if submodules is not None:
                 setattr(cls, 'submodules', submodules)
 
-            orig_state_dict = getattr(cls, 'state_dict', lambda _: {})
+            orig_state_dict = getattr(cls, 'state_dict', lambda _: dict())
             orig_load_state_dict = getattr(cls, 'load_state_dict',
                                            lambda *_: None)
 
@@ -180,7 +181,7 @@ class App:
                 if states:
                     d = {k: getattr(sf, s) for s in states}
                 else:
-                    d = {}
+                    d = dict()
                 d.update(orig_state_dict(sf))
                 return d
 
@@ -256,7 +257,7 @@ class App:
             new_f.args = Configuration(**f_args)
             return f(*args, **cfg)
 
-        class Cmd(Command):
+        class _Command(Command):
             def __init__(self, _app, parser):
                 for arg in positional[1:]:
                     parser.add_argument('-' + arg)
@@ -267,8 +268,8 @@ class App:
             def run(self, ws, args):
                 return new_f(ws, **args._asdict())
 
-        Cmd.__name__ = f.__name__
-        self.register_command(Cmd)
+        _Command.__name__ = f.__name__
+        self.register_command(_Command)
 
         return new_f
 
@@ -426,7 +427,7 @@ class config(Command):
         try:
             _modules = app._modules
         except ImportError:
-            _modules = {}
+            _modules = dict()
 
         for module, module_cls in _modules.items():
             _parser_formatter = argparse.ArgumentDefaultsHelpFormatter

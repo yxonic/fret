@@ -3,7 +3,18 @@ import inspect
 import itertools
 import logging
 import signal
-from collections import OrderedDict
+import sys
+
+
+if sys.implementation.name == 'cpython':
+    _lowest_version = (3, 6)
+else:
+    _lowest_version = (3, 7)
+if sys.version_info >= _lowest_version:
+    _dict = dict
+else:
+    from collections import OrderedDict
+    _dict = OrderedDict
 
 
 class Configuration:
@@ -11,7 +22,7 @@ class Configuration:
     __slots__ = '_config'
 
     def __init__(self, *args, **kwargs):
-        self._config = OrderedDict(*args, **kwargs)
+        self._config = _dict(*args, **kwargs)
 
     def _keys(self):
         return self._config.keys()
@@ -215,7 +226,7 @@ def stateful(*states):
 _sigint_handler = signal.getsignal(signal.SIGINT)
 
 
-def nonbreak(f=None):  # pragma: no cover
+def nonbreak(f=None):
     """Make sure a loop is not interrupted in between an iteration."""
     if f is not None:
         it = iter(f)

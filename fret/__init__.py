@@ -9,6 +9,7 @@ _logger.setLevel(_logging.INFO)
 
 
 class _ColoredFormatter(_logging.Formatter):
+    """Formatter for colored log."""
     _LOG_COLORS = {
         'WARNING': 'y',
         'INFO': 'g',
@@ -17,7 +18,7 @@ class _ColoredFormatter(_logging.Formatter):
         'ERROR': 'r'
     }
 
-    def format(self, record):  # pragma: no cover
+    def format(self, record):
         levelname = record.levelname
         if levelname in self._LOG_COLORS:
             record.levelname = _colored(

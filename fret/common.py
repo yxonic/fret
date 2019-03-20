@@ -9,6 +9,8 @@ import toml
 
 from .exceptions import NotConfiguredError, NoWorkspaceError
 from .util import classproperty, Configuration, stateful, overload
+# noinspection PyShadowingBuiltins
+from .util import _dict as dict
 
 
 class Workspace:
@@ -19,7 +21,7 @@ class Workspace:
     def __init__(self, app, path, config=None):
         self._app = app
         self._path = pathlib.Path(path)
-        self._modules = {}
+        self._modules = dict()
         if self.config_path.exists():
             conf = toml.load(self.config_path.open())
             for name, cfg in conf.items():
@@ -112,7 +114,7 @@ class Workspace:
 
     def save(self, obj, tag):
         env = self._modules
-        args = obj.spec._dict() if hasattr(obj, 'spec') else {}
+        args = obj.spec._dict() if hasattr(obj, 'spec') else dict()
         state = obj.state_dict()
         if isinstance(tag, str) and not tag.endswith('.pt'):
             f = self.snapshot(obj.build_name + '.' + tag + '.pt')
@@ -172,7 +174,7 @@ class Run:
     def __init__(self, ws, tag, resume):
         self._ws = ws
         self._id = None
-        self._states = {}
+        self._states = dict()
         self._index = 0
         if resume:
             ids = [filename.name for filename in ws.snapshot().iterdir()
