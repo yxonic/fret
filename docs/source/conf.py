@@ -29,6 +29,10 @@ import fret
 version = fret.__version__
 release = version
 
+with open('tutorial.md', 'w') as of:
+    content = open('../../README.md').read()
+    of.write(content[content.index('##'):])
+
 
 # -- General configuration ---------------------------------------------------
 
@@ -47,6 +51,7 @@ extensions = [
     'sphinx.ext.viewcode',
     'sphinx.ext.githubpages',
     'sphinx.ext.napoleon',
+    'recommonmark'
 ]
 
 # autodoc configurations
@@ -60,7 +65,7 @@ templates_path = ['_templates']
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
 #
-source_suffix = '.rst'
+source_suffix = ['.rst', '.md']
 
 # The master toctree document.
 master_doc = 'index'

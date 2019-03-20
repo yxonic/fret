@@ -15,7 +15,8 @@ test_deps = [
 ]
 doc_deps = [
     'sphinx',
-    'sphinx-rtd-theme'
+    'sphinx-rtd-theme',
+    'recommonmark'
 ]
 dev_deps = test_deps + doc_deps + [
     'setuptools>=40',
