@@ -30,7 +30,7 @@ setup(
     license='MIT',
     author='yxonic',
     author_email='yxonic@gmail.com',
-    description='REProducible Experimental environment.',
+    description='Framework for Reproducible ExperimenTs.',
     long_description=long_description,
     long_description_content_type='text/markdown',
     packages=['fret'],
