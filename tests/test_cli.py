@@ -64,8 +64,7 @@ def test(ws):
     print(model.weight)
     return model
 
-@fret.configurable
-@fret.stateful('weight')
+@fret.configurable(states=['weight'])
 class Model:
     def __init__(self):
         self.weight = 0

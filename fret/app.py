@@ -184,7 +184,8 @@ class App:
             # print traceback info to screen only
             import traceback
             sys.stderr.write(traceback.format_exc())
-            logger.error('exception occurred: %s', e)
+            logger.error('exception occurred: %s: %s',
+                         e.__class__.__name__, e)
 
     def configurable(self, wraps=None, submodules=None, states=None,
                      build_subs=True):
@@ -201,7 +202,7 @@ class App:
 
             def state_dict(sf):
                 if states:
-                    d = {k: getattr(sf, s) for s in states}
+                    d = {s: getattr(sf, s) for s in states}
                 else:
                     d = dict()
                 d.update(orig_state_dict(sf))
