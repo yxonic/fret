@@ -86,25 +86,25 @@ def colored(fmt, fg=None, bg=None, style=None):
     Return colored string.
 
     List of colours (for fg and bg):
-        k:   black
-        r:   red
-        g:   green
-        y:   yellow
-        b:   blue
-        m:   magenta
-        c:   cyan
-        w:   white
+        - k:   black
+        - r:   red
+        - g:   green
+        - y:   yellow
+        - b:   blue
+        - m:   magenta
+        - c:   cyan
+        - w:   white
 
     List of styles:
-        b:   bold
-        i:   italic
-        u:   underline
-        s:   strike through
-        x:   blinking
-        r:   reverse
-        y:   fast blinking
-        f:   faint
-        h:   hide
+        - b:   bold
+        - i:   italic
+        - u:   underline
+        - s:   strike through
+        - x:   blinking
+        - r:   reverse
+        - y:   fast blinking
+        - f:   faint
+        - h:   hide
 
     Args:
         fmt (str): string to be colored

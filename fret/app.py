@@ -527,7 +527,7 @@ def configurable(wraps=None, submodules=None, build_subs=True, states=None):
     """Register configurable module under current app.
 
     Args:
-        wraps (class or None) : object to be decorated, could be given later.
+        wraps (class or None) : object to be decorated; could be given later
         submodules (list) : submodules of this module
         build_subs (bool) : whether submodules are built before building this
                             module (default: ``True``)
