@@ -7,8 +7,18 @@ build: test
 	rm -rf dist/*
 	python setup.py bdist_wheel sdist
 
+.test:
+	@pytest > /dev/null
+
+.build:
+	@rm -rf dist/*
+	@python setup.py bdist_wheel sdist > /dev/null
+
 release: test, build
 	-twine upload dist/* && git tag "v$(VERSION)"
-	git push && git push --tags
+	git push --tags
 
- .PHONY: test, build, release
+version: .build
+	@echo $(VERSION)
+
+.PHONY: test, build, release, version, .test, .build
