@@ -19,6 +19,27 @@ from .common import Module, Workspace
 from .util import classproperty, Configuration, colored, _dict as dict
 
 
+class Command(abc.ABC):
+    """Command interface."""
+    __slots__ = []
+
+    @classproperty
+    def help(cls):
+        return 'command ' + cls.__name__.lower()
+
+    def _run(self, args):
+        ws = get_app().workspace(args.workspace)
+        cmd = args.command
+        del args.command, args.func, args.workspace
+        args = {name: value for (name, value) in args._get_kwargs()}
+        args = namedtuple(cmd, args.keys())(*args.values())
+        return self.run(ws, args)
+
+    @abc.abstractmethod
+    def run(self, ws, args):
+        raise NotImplementedError
+
+
 class App:
     """Application object. In charge of locating suitable app, importing
     modules, and run commands."""
@@ -170,6 +191,7 @@ class App:
         def wrapper(cls):
             orig_init = cls.__init__
             spec = funcspec(orig_init)
+
             if submodules is not None:
                 setattr(cls, 'submodules', submodules)
 
@@ -200,31 +222,10 @@ class App:
 
             def new_init(sf, *args, **kwargs):
                 # get config from signature
-                allowed_args = set(spec.pos[1:]) | set(x[0] for x in spec.kw)
-                cfg = ins.getcallargs(orig_init, sf, *args,
-                                      **{_k: _v for _k, _v in kwargs.items()
-                                         if _k in allowed_args})
-                del cfg['self']
-
-                defaults = {_k: _v for _k, _v in spec.kw}
-                for name in defaults:
-                    value = cfg[name]
-                    if value != defaults[name]._params:
-                        continue
-                    cfg[name] = defaults[name].default()
-
+                args, kwargs, cfg = spec.get_call_args(sf, *args, **kwargs)
                 if not hasattr(sf, 'config'):
-                    _cfg = cfg.copy()
-                    _cfg.update(kwargs)
-                    if spec.varkw is not None:
-                        del _cfg[spec.varkw]
-                    Module.__init__(sf, **_cfg)
-
-                if spec.varkw is None:
-                    orig_init(sf, **cfg)
-                else:
-                    cfg.update(kwargs)
-                    orig_init(sf, **cfg)
+                    Module.__init__(sf, **dict(cfg[1:]))
+                orig_init(*args, **kwargs)
 
             # inherit Module methods
             for k, v in Module.__dict__.items():
@@ -250,8 +251,8 @@ class App:
 
         @functools.wraps(f)
         def new_f(*args, **kwargs):
-            args, kwargs, cfg = spec(*args, **kwargs)
-            new_f.args = cfg
+            args, kwargs, cfg = spec.get_call_args(*args, **kwargs)
+            new_f.args = Configuration(cfg[1:])
             return f(*args, **kwargs)
 
         class _Command(Command):
@@ -272,10 +273,10 @@ class App:
 
 
 class funcspec:
+    __slots__ = ['pos', 'kw', 'kw_only']
+
     def __init__(self, f):
         spec = ins.getfullargspec(f)
-        self.varargs = spec.varargs
-        self.varkw = spec.varkw
         if spec.defaults:
             self.kw_only = False
             n_config = len(spec.defaults)
@@ -292,7 +293,7 @@ class funcspec:
             else:
                 self.kw = []
 
-    def __call__(self, *args, **kwargs):
+    def get_call_args(self, *args, **kwargs):
         defaults = dict((k, v.default()) for k, v in self.kw)
         if not self.kw_only and len(args) > len(self.pos):
             n_other = len(args) - len(self.pos)
@@ -300,8 +301,7 @@ class funcspec:
                                   for i in range(n_other)]))
             args = args[:-n_other]
         defaults.update(kwargs)
-        cfg = defaults.copy()
-        cfg.update(dict(zip(self.pos, args)))
+        cfg = list(zip(self.pos, args)) + list(defaults.items())
         return args, defaults, cfg
 
 
@@ -397,27 +397,6 @@ class _ArgumentParser(argparse.ArgumentParser):
         self.print_usage(sys.stderr)
         err = colored('error:', 'r', style='b')
         self.exit(2, '%s %s\n' % (err, message))
-
-
-class Command(abc.ABC):
-    """Command interface."""
-    __slots__ = []
-
-    @classproperty
-    def help(cls):
-        return 'command ' + cls.__name__.lower()
-
-    def _run(self, args):
-        ws = get_app().workspace(args.workspace)
-        cmd = args.command
-        del args.command, args.func, args.workspace
-        args = {name: value for (name, value) in args._get_kwargs()}
-        args = namedtuple(cmd, args.keys())(*args.values())
-        return self.run(ws, args)
-
-    @abc.abstractmethod
-    def run(self, ws, args):
-        raise NotImplementedError
 
 
 class config(Command):
@@ -535,17 +514,31 @@ def set_global_app(app):
     _app = app
 
 
-def workspace(*args, **kwargs):
-    """Build workspace within current app."""
-    return get_app().workspace(*args, **kwargs)
+def workspace(path=None):
+    """Build workspace within current app.
+
+    Args:
+        path (str) : workspace path (default: ``None``)
+    """
+    return get_app().workspace(path)
 
 
-def configurable(*args, **kwargs):
-    return get_app().configurable(*args, **kwargs)
+def configurable(wraps=None, submodules=None, build_subs=True, states=None):
+    """Register configurable module under current app.
+
+    Args:
+        wraps (class or None) : object to be decorated, could be given later.
+        submodules (list) : submodules of this module
+        build_subs (bool) : whether submodules are built before building this
+                            module (default: ``True``)
+        states (list) : members that would appear in state_dict
+    """
+    return get_app().configurable(wraps, submodules, states, build_subs)
 
 
-def command(*args, **kwargs):
-    return get_app().command(*args, **kwargs)
+def command(f):
+    """Function decorator that would turn a function into a fret command."""
+    return get_app().command(f)
 
 
 __all__ = ['get_app', 'set_global_app', 'argspec', 'App',
