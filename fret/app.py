@@ -169,7 +169,7 @@ class App:
                      build_subs=True):
         def wrapper(cls):
             orig_init = cls.__init__
-            positional, opt, varkw = _get_args(orig_init)
+            spec = funcspec(orig_init)
             if submodules is not None:
                 setattr(cls, 'submodules', submodules)
 
@@ -195,18 +195,18 @@ class App:
             @classmethod
             def add_arguments(_, parser):
                 with ParserBuilder(parser) as builder:
-                    for name, spec in opt:
-                        builder.add_opt(name, spec)
+                    for name, opt in spec.kw:
+                        builder.add_opt(name, opt)
 
             def new_init(sf, *args, **kwargs):
                 # get config from signature
-                allowed_args = set(positional[1:]) | set(x[0] for x in opt)
+                allowed_args = set(spec.pos[1:]) | set(x[0] for x in spec.kw)
                 cfg = ins.getcallargs(orig_init, sf, *args,
                                       **{_k: _v for _k, _v in kwargs.items()
                                          if _k in allowed_args})
                 del cfg['self']
 
-                defaults = {_k: _v for _k, _v in opt}
+                defaults = {_k: _v for _k, _v in spec.kw}
                 for name in defaults:
                     value = cfg[name]
                     if value != defaults[name]._params:
@@ -216,11 +216,11 @@ class App:
                 if not hasattr(sf, 'config'):
                     _cfg = cfg.copy()
                     _cfg.update(kwargs)
-                    if varkw is not None:
-                        del _cfg[varkw]
+                    if spec.varkw is not None:
+                        del _cfg[spec.varkw]
                     Module.__init__(sf, **_cfg)
 
-                if varkw is None:
+                if spec.varkw is None:
                     orig_init(sf, **cfg)
                 else:
                     cfg.update(kwargs)
@@ -246,23 +246,20 @@ class App:
             return wrapper(wraps)
 
     def command(self, f):
-        positional, opt, _ = _get_args(f)
+        spec = funcspec(f)
 
         @functools.wraps(f)
         def new_f(*args, **kwargs):
-            cfg = {k: v.default() for k, v in opt}
-            cfg.update(kwargs)
-            f_args = {k: v for k, v in zip(positional[1:], args[1:])}
-            f_args.update(cfg)
-            new_f.args = Configuration(**f_args)
-            return f(*args, **cfg)
+            args, kwargs, cfg = spec(*args, **kwargs)
+            new_f.args = cfg
+            return f(*args, **kwargs)
 
         class _Command(Command):
-            def __init__(self, _app, parser):
-                for arg in positional[1:]:
+            def __init__(self, _, parser):
+                for arg in spec.pos[1:]:
                     parser.add_argument('-' + arg)
                 with ParserBuilder(parser) as builder:
-                    for k, v in opt:
+                    for k, v in spec.kw:
                         builder.add_opt(k, v)
 
             def run(self, ws, args):
@@ -274,15 +271,38 @@ class App:
         return new_f
 
 
-def _get_args(f):
-    spec = ins.getfullargspec(f)
-    n_config = len(spec.defaults) if spec.defaults else 0
-    args = spec.args if n_config == 0 else spec.args[:-n_config]
-    defaults = [v if isinstance(v, argspec) else argspec.from_param(v)
-                for v in spec.defaults] if spec.defaults else []
-    kwargs = [] if n_config == 0 else \
-        [(k, v) for k, v in zip(spec.args[-n_config:], defaults)]
-    return args, kwargs, spec.varkw
+class funcspec:
+    def __init__(self, f):
+        spec = ins.getfullargspec(f)
+        self.varargs = spec.varargs
+        self.varkw = spec.varkw
+        if spec.defaults:
+            self.kw_only = False
+            n_config = len(spec.defaults)
+            self.pos = spec.args[:-n_config]
+            defaults = [v if isinstance(v, argspec) else argspec.from_param(v)
+                        for v in spec.defaults]
+            self.kw = [] if n_config == 0 else \
+                [(k, v) for k, v in zip(spec.args[-n_config:], defaults)]
+        else:
+            self.kw_only = True
+            self.pos = spec.args
+            if spec.kwonlydefaults:
+                self.kw = list(spec.kwonlydefaults.items())
+            else:
+                self.kw = []
+
+    def __call__(self, *args, **kwargs):
+        defaults = dict((k, v.default()) for k, v in self.kw)
+        if not self.kw_only and len(args) > len(self.pos):
+            n_other = len(args) - len(self.pos)
+            defaults.update(dict([(self.kw[i][0], args[i-n_other])
+                                  for i in range(n_other)]))
+            args = args[:-n_other]
+        defaults.update(kwargs)
+        cfg = defaults.copy()
+        cfg.update(dict(zip(self.pos, args)))
+        return args, defaults, cfg
 
 
 class argspec:
