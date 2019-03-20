@@ -50,7 +50,10 @@ class Configuration:
         return key in self._config
 
     def __eq__(self, other):
-        return dict(self._config) == dict(other._config)
+        if isinstance(other, Configuration):
+            return dict(self._config) == dict(other._config)
+        else:
+            return dict(self._config) == other
 
     def __iter__(self):
         return iter(self._config)

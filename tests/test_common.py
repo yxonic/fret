@@ -36,11 +36,11 @@ class C:
 class D:
     def __init__(self, sub):
         self.sub = sub
-        assert sub.config
 
 
 def test_module():
     c = D(A())
+    assert c.sub.config == {'a': 0}
     with pytest.raises(fret.exceptions.NoWorkspaceError):
         _ = c.ws
 

@@ -281,10 +281,10 @@ class funcspec:
             self.kw_only = False
             n_config = len(spec.defaults)
             self.pos = spec.args[:-n_config]
-            defaults = [v if isinstance(v, argspec) else argspec.from_param(v)
-                        for v in spec.defaults]
+            opts = [v if isinstance(v, argspec) else argspec.from_param(v)
+                    for v in spec.defaults]
             self.kw = [] if n_config == 0 else \
-                [(k, v) for k, v in zip(spec.args[-n_config:], defaults)]
+                list(zip(spec.args[-n_config:], opts))
         else:
             self.kw_only = True
             self.pos = spec.args
@@ -295,11 +295,13 @@ class funcspec:
 
     def get_call_args(self, *args, **kwargs):
         defaults = dict((k, v.default()) for k, v in self.kw)
-        if not self.kw_only and len(args) > len(self.pos):
-            n_other = len(args) - len(self.pos)
-            defaults.update(dict([(self.kw[i][0], args[i-n_other])
-                                  for i in range(n_other)]))
-            args = args[:-n_other]
+        if not self.kw_only:
+            if len(args) > len(self.pos):
+                n_other = len(args) - len(self.pos)
+                defaults.update(dict([(self.kw[i][0], args[i-n_other])
+                                      for i in range(n_other)]))
+                args = args[:-n_other]
+        defaults.update(dict([(k, v.default()) for k, v in self.kw]))
         defaults.update(kwargs)
         cfg = list(zip(self.pos, args)) + list(defaults.items())
         return args, defaults, cfg
@@ -349,7 +351,7 @@ class argspec:
         return obj
 
     def default(self):
-        return self._kwargs.get('default') or None
+        return self._kwargs.get('default')
 
     def spec(self):
         return self._args, self._kwargs
