@@ -15,8 +15,8 @@ build: test
 	@python setup.py bdist_wheel sdist > /dev/null
 
 release: test, build
-	-twine upload dist/* && git tag "v$(VERSION)"
-	git push --tags
+	-@twine upload dist/* && git tag "v$(VERSION)"
+	git push && git push --tags
 
 version: .build
 	@echo $(VERSION)
