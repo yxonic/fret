@@ -144,7 +144,7 @@ class A:
     def __init__(self, foo):
         ...
 
-@fret.configurable(submodules=['sub'])
+@fret.configurable(submodules=['sub'], build_subs=False)
 class B:
     def __init__(self, sub, bar=3):
         self.sub = sub(foo='bar')   # call sub to build submodule

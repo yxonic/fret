@@ -24,7 +24,7 @@ class B(A):
 
 
 # noinspection PyUnusedLocal
-@fret.configurable(submodules=['sub'])
+@fret.configurable(submodules=['sub'], build_subs=False)
 class C:
     def __init__(self, sub, c):
         self.sub = sub()
@@ -32,7 +32,7 @@ class C:
 
 
 # noinspection PyUnusedLocal
-@fret.configurable(submodules=['sub'], initialize_subs=True)
+@fret.configurable(submodules=['sub'])
 class D:
     def __init__(self, sub):
         self.sub = sub

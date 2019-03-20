@@ -166,7 +166,7 @@ class App:
             logger.error('exception occurred: %s', e)
 
     def configurable(self, wraps=None, submodules=None, states=None,
-                     initialize_subs=False):
+                     build_subs=True):
         def wrapper(cls):
             orig_init = cls.__init__
             positional, opt, varkw = _get_args(orig_init)
@@ -234,7 +234,7 @@ class App:
             setattr(cls, 'add_arguments', add_arguments)
             setattr(cls, 'state_dict', state_dict)
             setattr(cls, 'load_state_dict', load_state_dict)
-            setattr(cls, '_init_subs', initialize_subs)
+            setattr(cls, '_build_subs', build_subs)
 
             if not cls.__name__.startswith('_'):
                 self.register_module(cls)

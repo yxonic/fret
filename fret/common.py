@@ -99,7 +99,7 @@ class Workspace:
 
         for sub in cls.submodules:
             if sub not in cfg or isinstance(cfg[sub], str):
-                if cls._init_subs:
+                if cls._build_subs:
                     cfg[sub] = self.build(cfg.get(sub) or sub)
                 else:
                     cfg[sub] = Builder(self, cfg.get(sub) or sub)
