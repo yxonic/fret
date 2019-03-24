@@ -7,10 +7,10 @@ import sys
 
 
 if sys.implementation.name == 'cpython':
-    _lowest_version = (3, 6)
+    _LOWEST_VERSION = (3, 6)
 else:
-    _lowest_version = (3, 7)
-if sys.version_info >= _lowest_version:
+    _LOWEST_VERSION = (3, 7)
+if sys.version_info >= _LOWEST_VERSION:
     _dict = dict
 else:
     from collections import OrderedDict
@@ -19,7 +19,7 @@ else:
 
 class Configuration:
     """Easy to construct, use and read configuration class."""
-    __slots__ = '_config'
+    __slots__ = ['_config']
 
     def __init__(self, *args, **kwargs):
         self._config = _dict(*args, **kwargs)
@@ -51,9 +51,9 @@ class Configuration:
 
     def __eq__(self, other):
         if isinstance(other, Configuration):
+            # pylint: disable=protected-access
             return dict(self._config) == dict(other._config)
-        else:
-            return dict(self._config) == other
+        return dict(self._config) == other
 
     def __iter__(self):
         return iter(self._config)

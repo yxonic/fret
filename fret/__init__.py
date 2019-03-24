@@ -1,11 +1,11 @@
+import logging as _logging
+
 from .util import nonbreak, stateful
 from .util import colored as _colored
 from .app import workspace, configurable, command, argspec
 
-import logging as _logging
-
-_logger = _logging.getLogger()
-_logger.setLevel(_logging.INFO)
+_LOGGER = _logging.getLogger()
+_LOGGER.setLevel(_logging.INFO)
 
 
 class _ColoredFormatter(_logging.Formatter):
@@ -29,12 +29,12 @@ class _ColoredFormatter(_logging.Formatter):
         return _logging.Formatter.format(self, record)
 
 
-_log_formatter = _ColoredFormatter(
+_LOG_FORMATTER = _ColoredFormatter(
     '%(levelname)s %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
-_console_handler = _logging.StreamHandler()
-_console_handler.setFormatter(_log_formatter)
-_logger.addHandler(_console_handler)
+_CONSOLE_HANDLER = _logging.StreamHandler()
+_CONSOLE_HANDLER.setFormatter(_LOG_FORMATTER)
+_LOGGER.addHandler(_CONSOLE_HANDLER)
 
 __version__ = '0.2.3.post3'

@@ -9,12 +9,12 @@ import os
 import pathlib
 import shutil
 import sys
-from collections import namedtuple
 
 import toml
 
 from .exceptions import NotConfiguredError
 from .common import Module, Workspace
+# pylint: disable=redefined-builtin
 # noinspection PyShadowingBuiltins
 from .util import classproperty, Configuration, colored, _dict as dict
 
@@ -24,15 +24,16 @@ class Command(abc.ABC):
     __slots__ = []
 
     @classproperty
-    def help(cls):
+    def help(cls):  # pylint: disable=no-self-argument
+        # pylint: disable=no-member
         return 'command ' + cls.__name__.lower()
 
     def _run(self, args):
+        # pylint: disable=protected-access
         ws = get_app().workspace(args.workspace)
-        cmd = args.command
         del args.command, args.func, args.workspace
         args = {name: value for (name, value) in args._get_kwargs()}
-        args = namedtuple(cmd, args.keys())(*args.values())
+        args = Configuration(args)
         return self.run(ws, args)
 
     @abc.abstractmethod
@@ -147,6 +148,7 @@ class App:
                 _cmd, help=_cls.help,
                 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
             subparsers[_cmd] = _sub
+            # pylint: disable=protected-access
             _sub.set_defaults(func=_cls(self, _sub)._run)
 
         args = main_parser.parse_args() if args is None \
@@ -180,7 +182,7 @@ class App:
             print('error:', e)
             subparsers['config'].print_usage()
             sys.exit(1)
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             # print traceback info to screen only
             import traceback
             sys.stderr.write(traceback.format_exc())
@@ -265,7 +267,7 @@ class App:
                         builder.add_opt(k, v)
 
             def run(self, ws, args):
-                return new_f(ws, **args._asdict())
+                return new_f(ws, **args._dict())
 
         _Command.__name__ = f.__name__
         self.register_command(_Command)
@@ -348,7 +350,7 @@ class argspec:
             kwargs['type'] = type(kwargs['default'])
 
         obj = cls(**kwargs)
-        obj._params = param
+        obj._params = param  # pylint: disable=protected-access
         return obj
 
     def default(self):
@@ -368,7 +370,7 @@ class ParserBuilder:
     def add_opt(self, name, spec):
         if spec.default() is True:
             # change name for better bool support
-            spec._kwargs['dest'] = name
+            spec._kwargs['dest'] = name  # pylint: disable=protected-access
             name = 'no_' + name
         self._names.append(name)
         self._spec.append(spec)
@@ -417,6 +419,7 @@ class config(Command):
     help = 'configure module for workspace'
 
     def __init__(self, app, parser):
+        # pylint: disable=protected-access
         parser.add_argument('name', default='main', nargs='?',
                             help='module name')
         if sys.version_info < (3, 7):
@@ -513,7 +516,7 @@ def get_app():
 
 def set_global_app(app):
     """Set current global app."""
-    global _app
+    global _app  # pylint: disable=global-statement
     _app = app
 
 

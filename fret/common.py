@@ -10,7 +10,7 @@ import toml
 from .exceptions import NotConfiguredError, NoWorkspaceError
 from .util import classproperty, Configuration, stateful, overload
 # noinspection PyShadowingBuiltins
-from .util import _dict as dict
+from .util import _dict as dict  # pylint: disable=redefined-builtin
 
 
 class Workspace:
@@ -62,7 +62,7 @@ class Workspace:
     def register(self, name, module, **kwargs):
         """Register and save module configuration."""
         if not ins.isclass(module):
-            cfg = module.config._dict()
+            cfg = module.config._dict()  # pylint: disable=protected-access
             cfg.update(kwargs)
             self._modules[name] = (module.__class__.__name__, cfg)
         else:
@@ -95,11 +95,11 @@ class Workspace:
         try:
             cls = self._app.load_module(cls_name)
         except KeyError:
-            raise KeyError('definition of module %s not found', cls_name)
+            raise KeyError('definition of module %s not found' % cls_name)
 
         for sub in cls.submodules:
             if sub not in cfg or isinstance(cfg[sub], str):
-                if cls._build_subs:
+                if cls._build_subs:  # pylint: disable=protected-access
                     cfg[sub] = self.build(cfg.get(sub) or sub)
                 else:
                     cfg[sub] = Builder(self, cfg.get(sub) or sub)
@@ -113,6 +113,7 @@ class Workspace:
         return obj
 
     def save(self, obj, tag):
+        # pylint: disable=protected-access
         env = self._modules
         args = obj.spec._dict() if hasattr(obj, 'spec') else dict()
         state = obj.state_dict()
@@ -319,12 +320,14 @@ class Builder:
         self._name = name
 
     def __eq__(self, other):
+        # pylint: disable=protected-access
         return self.ws._modules[self._name] == other.ws._modules[other._name]
 
     def __call__(self, **kwargs):
         return self.ws.build(self._name, **kwargs)
 
     def __str__(self):
+        # pylint: disable=protected-access
         cls_name, cfg = self.ws._modules[self._name]
         return cls_name + '(' + str(Configuration(cfg)) + ')'
 
@@ -332,11 +335,13 @@ class Builder:
         return str(self)
 
     def __getattr__(self, item):
+        # pylint: disable=protected-access
         cls_name, _ = self.ws._try_get_module(self._name)
         try:
+            # pylint: disable=protected-access
             cls = self.ws._app.load_module(cls_name)
         except KeyError:
-            raise KeyError('definition of module %s not found', cls_name)
+            raise KeyError('definition of module %s not found' % cls_name)
         return getattr(cls, item)
 
 
@@ -360,8 +365,8 @@ class Module:
         self._ws = ws
 
     @classproperty
-    def help(cls):
-        return 'module ' + cls.__name__
+    def help(cls):  # pylint: disable=no-self-argument
+        return 'module ' + cls.__name__  # pylint: disable=no-member
 
     @classmethod
     def _add_arguments(cls, parser: argparse.ArgumentParser):
@@ -375,7 +380,6 @@ class Module:
     @classmethod
     def add_arguments(cls, parser: argparse.ArgumentParser):
         """Add arguments to an argparse subparser."""
-        pass
 
     def __init__(self, **kwargs):
         """
