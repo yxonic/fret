@@ -33,26 +33,46 @@ class Workspace:
 
     @property
     def path(self):
+        """Workspace root path."""
         if not self._path.exists():
             self._path.mkdir(parents=True)
         return self._path
 
     @property
     def config_path(self):
+        """Workspace configuration path."""
         cp = self.path.joinpath('config.toml')
         return cp
 
     def log(self, *filename):
+        """Get log file path within current workspace.
+
+        Args:
+            filename (str or list): relative path to file; if ommited, returns
+                                    root path of logs.
+        """
         path = self.path.joinpath('log', *filename)
         _mkdir(path, not filename or filename[-1].endswith('/'))
         return path
 
     def result(self, *filename):
+        """Get result file path within current workspace.
+
+        Args:
+            filename (str or list): relative path to file; if ommited, returns
+                                    root path of results.
+        """
         path = self.path.joinpath('result', *filename)
         _mkdir(path, not filename or filename[-1].endswith('/'))
         return path
 
     def snapshot(self, *filename):
+        """Get snapshot file path within current workspace.
+
+        Args:
+            filename (str or list): relative path to file; if ommited, returns
+                                    root path of snapshots.
+        """
         path = self.path.joinpath('snapshot', *filename)
         _mkdir(path, not filename or filename[-1].endswith('/'))
         return path
@@ -69,6 +89,7 @@ class Workspace:
             self._modules[name] = (module.__name__, kwargs)
 
     def write(self):
+        """Save module configuration of this workspace to file."""
         cfg = {name: dict({'module': cls_name}, **cfg)
                for name, (cls_name, cfg) in self._modules.items()}
         toml.dump(cfg, self.config_path.open('w'))
@@ -113,6 +134,10 @@ class Workspace:
         return obj
 
     def save(self, obj, tag):
+        """Save module as a snapshot.
+
+        Args:
+            tag (str or pathlib.Path) : snapshot tag or path."""
         # pylint: disable=protected-access
         env = self._modules
         args = obj.spec._dict() if hasattr(obj, 'spec') else dict()
@@ -126,6 +151,10 @@ class Workspace:
     @overload((..., str, ...), ...,
               (..., ...), lambda self, t: (self, 'main', t))
     def load(self, name, tag):
+        """Load module from a snapshot.
+
+        Args:
+            tag (str or pathlib.Path) : snapshot tag or path."""
         if isinstance(tag, str) and not tag.endswith('.pt'):
             f = self.snapshot(name + '.' + tag + '.pt')
         else:
@@ -158,6 +187,9 @@ class Workspace:
         return logger
 
     def run(self, tag, resume=True):
+        """Initiate a context manager that provides a persistent running
+        environment. Mainly used to suspend and resume a time consuming
+        process."""
         return Run(self, tag, resume)
 
     def __str__(self):

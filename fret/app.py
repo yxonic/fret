@@ -276,6 +276,8 @@ class App:
 
 
 class funcspec:
+    """Utility to generate argument specification from function signature."""
+
     __slots__ = ['pos', 'kw', 'kw_only']
 
     def __init__(self, f):
@@ -361,6 +363,7 @@ class argspec:
 
 
 class ParserBuilder:
+    """Utility to generate CLI arguments in different styles."""
     def __init__(self, parser, style='java'):
         self._parser = parser
         self._style = style
@@ -368,6 +371,12 @@ class ParserBuilder:
         self._spec = []
 
     def add_opt(self, name, spec):
+        """Add option with specification.
+
+        Args:
+            name (str) : option name
+            spec (argspec): argument specification"""
+
         if spec.default() is True:
             # change name for better bool support
             spec._kwargs['dest'] = name  # pylint: disable=protected-access
@@ -530,7 +539,7 @@ def workspace(path=None):
 
 
 def configurable(wraps=None, submodules=None, build_subs=True, states=None):
-    """Register configurable module under current app.
+    """Class decorator that registers configurable module under current app.
 
     Args:
         wraps (class or None) : object to be decorated; could be given later

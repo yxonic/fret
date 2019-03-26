@@ -7,6 +7,9 @@ build: test
 	rm -rf dist/*
 	python setup.py bdist_wheel sdist
 
+doc:
+	cd docs; make html
+
 .test:
 	@pytest > /dev/null
 
