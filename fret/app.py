@@ -421,8 +421,8 @@ class config(Command):
     Example:
         .. code-block:: bash
 
-            $ python app.run -w ws/test config Simple -foo=5
-            In [ws/test]: configured Simple with Config(foo='5')
+            $ fret config Simple -foo=5
+            In [ws/_default]: configured "main" as "Simple" with: foo=5
     """
 
     help = 'configure module for workspace'
@@ -473,7 +473,6 @@ class config(Command):
         cfg = ws.config_path
         if cfg.exists():
             cfg = cfg.open().read().strip()
-            print(cfg)
             return cfg
         else:
             raise NotConfiguredError('no configuration in this workspace')
