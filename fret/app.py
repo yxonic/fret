@@ -389,9 +389,9 @@ class App:
 
         class _Command(Command):
             def __init__(self, _, parser):
-                for arg in spec.pos[int(not static):]:
-                    parser.add_argument('-' + arg)
                 with ParserBuilder(parser, argument_style) as builder:
+                    for arg in spec.pos[int(not static):]:
+                        builder.add_opt(arg, argspec())
                     for k, v in spec.kw:
                         builder.add_opt(k, v)
 
