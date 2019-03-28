@@ -41,6 +41,107 @@ class Command(abc.ABC):
         raise NotImplementedError
 
 
+class config(Command):
+    """Command ``config``,
+
+    Configure a module and its parameters for a workspace.
+
+    Example:
+        .. code-block:: bash
+
+            $ fret config Simple -foo=5
+            In [ws/_default]: configured "main" as "Simple" with: foo=5
+    """
+
+    help = 'configure module for workspace'
+
+    def __init__(self, app, parser):
+        # pylint: disable=protected-access
+        parser.add_argument('name', default='main', nargs='?',
+                            help='module name')
+        if sys.version_info < (3, 7):
+            subs = parser.add_subparsers(title='modules available',
+                                         dest='module')
+        else:
+            subs = parser.add_subparsers(title='modules available',
+                                         dest='module', required=False)
+        group_options = collections.defaultdict(set)
+        try:
+            _modules = app._modules
+        except ImportError:
+            _modules = dict()
+
+        for module, module_cls in _modules.items():
+            _parser_formatter = argparse.ArgumentDefaultsHelpFormatter
+            sub = subs.add_parser(module, help=module_cls.help,
+                                  formatter_class=_parser_formatter)
+            group = sub.add_argument_group('config')
+            module_cls._add_arguments(group)
+            for action in group._group_actions:
+                group_options[module].add(action.dest)
+
+            def save(args):
+                with get_app().workspace(args.workspace) as ws:
+                    m = args.module
+                    cfg = [(name, value)
+                           for (name, value) in args._get_kwargs()
+                           if name in group_options[m]]
+                    cfg = Configuration(cfg)
+                    msg = '[%s] configured "%s" as "%s"' % \
+                        (ws, args.name, m)
+                    if cfg._config:
+                        msg += ' with: ' + str(cfg)
+                    print(msg, file=sys.stderr)
+                    ws.register(args.name, get_app().load_module(m),
+                                **cfg._dict())
+
+            sub.set_defaults(func=save)
+
+    def run(self, ws, args):
+        cfg = ws.config_path
+        if cfg.exists():
+            cfg = cfg.open().read().strip()
+            return cfg
+        else:
+            raise NotConfiguredError('no configuration in this workspace')
+
+
+class clean(Command):
+    """Command ``clean``.
+
+    Remove all checkpoints in specific workspace. If ``--all`` is specified,
+    clean the entire workspace
+    """
+
+    help = 'clean workspace'
+
+    def __init__(self, _, parser):
+        parser.add_argument('--all', action='store_true',
+                            help='clean the entire workspace')
+        parser.add_argument('-c', dest='config', action='store_true',
+                            help='remove workspace configuration')
+        parser.add_argument('-l', dest='log', action='store_true',
+                            help='clear workspace logs')
+        parser.add_argument('-s', dest='snapshot', action='store_true',
+                            help='clear snapshots')
+
+    def run(self, ws, args):
+        if args.all:
+            shutil.rmtree(str(ws))
+        else:
+            if (not args.config and not args.log) or args.snapshot:
+                shutil.rmtree(str(ws.snapshot()))
+            if args.snapshot:
+                shutil.rmtree(str(ws.snapshot()))
+            if args.config:
+                try:
+                    (ws.path / 'config.toml').unlink()
+                except FileNotFoundError:
+                    pass
+            if args.log:
+                shutil.rmtree(str(ws.log()))
+
+
 class App:
     """Application object. In charge of locating suitable app, importing
     modules, and run commands."""
@@ -115,6 +216,13 @@ class App:
         if self._config is None:
             self.load()
         return self._config
+
+    @property
+    def argument_style(self):
+        style = self.config._get('argument_style')
+        if style not in ['java', 'gnu']:
+            return 'java'
+        return style
 
     def workspace(self, path=None):
         if path is None:
@@ -219,7 +327,7 @@ class App:
 
             @classmethod
             def add_arguments(_, parser):
-                with ParserBuilder(parser) as builder:
+                with ParserBuilder(parser, self.argument_style) as builder:
                     for name, opt in spec.kw:
                         builder.add_opt(name, opt)
 
@@ -227,7 +335,13 @@ class App:
                 # get config from signature
                 args, kwargs, cfg = spec.get_call_args(sf, *args, **kwargs)
                 if not hasattr(sf, 'config'):
-                    Module.__init__(sf, **dict(cfg[1:]))
+                    global_config = self.config._get(cls.__name__)
+                    if global_config:
+                        d = global_config.copy()
+                        d.update(dict(cfg[1:]))
+                    else:
+                        d = dict(cfg[1:])
+                    Module.__init__(sf, **d)
                 orig_init(*args, **kwargs)
 
             # inherit Module methods
@@ -250,26 +364,36 @@ class App:
             return wrapper(wraps)
 
     def command(self, f):
+        name = f.__name__
         spec = funcspec(f)
 
         @functools.wraps(f)
         def new_f(*args, **kwargs):
             args, kwargs, cfg = spec.get_call_args(*args, **kwargs)
-            new_f.args = Configuration(cfg[1:])
+            global_config = self.config._get(name)
+            if global_config:
+                d = global_config.copy()
+                d.update(dict(cfg[1:]))
+                cfg = d
+            else:
+                cfg = cfg[1:]
+            new_f.config = Configuration(cfg)
             return f(*args, **kwargs)
+
+        argument_style = self.argument_style
 
         class _Command(Command):
             def __init__(self, _, parser):
                 for arg in spec.pos[1:]:
                     parser.add_argument('-' + arg)
-                with ParserBuilder(parser) as builder:
+                with ParserBuilder(parser, argument_style) as builder:
                     for k, v in spec.kw:
                         builder.add_opt(k, v)
 
             def run(self, ws, args):
                 return new_f(ws, **args._dict())
 
-        _Command.__name__ = f.__name__
+        _Command.__name__ = name
         self.register_command(_Command)
 
         return new_f
@@ -411,107 +535,6 @@ class _ArgumentParser(argparse.ArgumentParser):
         self.print_usage(sys.stderr)
         err = colored('error:', 'r', style='b')
         self.exit(2, '%s %s\n' % (err, message))
-
-
-class config(Command):
-    """Command ``config``,
-
-    Configure a module and its parameters for a workspace.
-
-    Example:
-        .. code-block:: bash
-
-            $ fret config Simple -foo=5
-            In [ws/_default]: configured "main" as "Simple" with: foo=5
-    """
-
-    help = 'configure module for workspace'
-
-    def __init__(self, app, parser):
-        # pylint: disable=protected-access
-        parser.add_argument('name', default='main', nargs='?',
-                            help='module name')
-        if sys.version_info < (3, 7):
-            subs = parser.add_subparsers(title='modules available',
-                                         dest='module')
-        else:
-            subs = parser.add_subparsers(title='modules available',
-                                         dest='module', required=False)
-        group_options = collections.defaultdict(set)
-        try:
-            _modules = app._modules
-        except ImportError:
-            _modules = dict()
-
-        for module, module_cls in _modules.items():
-            _parser_formatter = argparse.ArgumentDefaultsHelpFormatter
-            sub = subs.add_parser(module, help=module_cls.help,
-                                  formatter_class=_parser_formatter)
-            group = sub.add_argument_group('config')
-            module_cls._add_arguments(group)
-            for action in group._group_actions:
-                group_options[module].add(action.dest)
-
-            def save(args):
-                with get_app().workspace(args.workspace) as ws:
-                    m = args.module
-                    cfg = [(name, value)
-                           for (name, value) in args._get_kwargs()
-                           if name in group_options[m]]
-                    cfg = Configuration(cfg)
-                    msg = '[%s] configured "%s" as "%s"' % \
-                        (ws, args.name, m)
-                    if cfg._config:
-                        msg += ' with: ' + str(cfg)
-                    print(msg, file=sys.stderr)
-                    ws.register(args.name, get_app().load_module(m),
-                                **cfg._dict())
-
-            sub.set_defaults(func=save)
-
-    def run(self, ws, args):
-        cfg = ws.config_path
-        if cfg.exists():
-            cfg = cfg.open().read().strip()
-            return cfg
-        else:
-            raise NotConfiguredError('no configuration in this workspace')
-
-
-class clean(Command):
-    """Command ``clean``.
-
-    Remove all checkpoints in specific workspace. If ``--all`` is specified,
-    clean the entire workspace
-    """
-
-    help = 'clean workspace'
-
-    def __init__(self, _, parser):
-        parser.add_argument('--all', action='store_true',
-                            help='clean the entire workspace')
-        parser.add_argument('-c', dest='config', action='store_true',
-                            help='remove workspace configuration')
-        parser.add_argument('-l', dest='log', action='store_true',
-                            help='clear workspace logs')
-        parser.add_argument('-s', dest='snapshot', action='store_true',
-                            help='clear snapshots')
-
-    def run(self, ws, args):
-        if args.all:
-            shutil.rmtree(str(ws))
-        else:
-            if (not args.config and not args.log) or args.snapshot:
-                shutil.rmtree(str(ws.snapshot()))
-            if args.snapshot:
-                shutil.rmtree(str(ws.snapshot()))
-            if args.config:
-                try:
-                    (ws.path / 'config.toml').unlink()
-                except FileNotFoundError:
-                    pass
-            if args.log:
-                shutil.rmtree(str(ws.log()))
 
 
 _app = App()
