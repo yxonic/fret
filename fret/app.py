@@ -396,7 +396,10 @@ class App:
                         builder.add_opt(k, v)
 
             def run(self, ws, args):
-                return new_f(ws, **args._dict())
+                if static:
+                    return new_f(**args._dict())
+                else:
+                    return new_f(ws, **args._dict())
 
         _Command.__name__ = name
         self.register_command(_Command)

@@ -125,7 +125,7 @@ def test_workspace(tmpdir: py.path.local):
         assert s.sum() == 1
 
         for i in fret.util.nonbreak(run.range(10)):
-            if i >= 5:
+            if i == 5:
                 break
 
     with ws.run('test') as run:
@@ -137,7 +137,7 @@ def test_workspace(tmpdir: py.path.local):
         assert s.sum() == 3
 
         for i in fret.util.nonbreak(run.range(10)):
-            assert i == 6
+            assert i == 5
             break
 
     with ws.run('test', resume=False) as run:

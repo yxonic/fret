@@ -8,7 +8,7 @@ from datetime import datetime
 import toml
 
 from .exceptions import NotConfiguredError, NoWorkspaceError
-from .util import classproperty, Configuration, stateful, overload
+from .util import classproperty, Configuration, stateful, overload, Iterator
 # noinspection PyShadowingBuiltins
 from .util import _dict as dict  # pylint: disable=redefined-builtin
 
@@ -202,13 +202,14 @@ class Workspace:
 class Run:
     """Class designed for running state persistency."""
 
-    __slots__ = ['_ws', '_id', '_states', '_index']
+    __slots__ = ['_ws', '_id', '_states', '_index', '_seen']
 
     def __init__(self, ws, tag, resume):
         self._ws = ws
         self._id = None
         self._states = dict()
         self._index = 0
+        self._seen = set()  # only load once from file
         if resume:
             ids = [filename.name for filename in ws.snapshot().iterdir()
                    if filename.is_dir() and filename.name.startswith(tag)]
@@ -244,7 +245,8 @@ class Run:
         if name is None:
             name = str(self._index)
             self._index += 1
-        if name in self._states:
+        if name in self._states and name not in self._seen:
+            self._seen.add(name)
             return self._states[name]
         else:
             self._states[name] = value
@@ -257,11 +259,17 @@ class Run:
         if name is None:
             name = str(self._index)
             self._index += 1
-        if name in self._states:
+        if name in self._states and name not in self._seen:
+            self._seen.add(name)
             obj.load_state_dict(self._states[name])
-
         self._states[name] = obj
         return obj
+
+    @overload((..., str, ...), ...,
+              (..., ...), lambda self, m: (self, None, m),
+              ..., ...)
+    def iter(self, name, data, *label, **kwargs):
+        return self.register(name, Iterator(data, *label, **kwargs))
 
     @overload((..., str), ...,
               (...,), lambda self: (self, None))
@@ -338,7 +346,7 @@ class Range:
 
     def __iter__(self):
         for i in range(self.start, self.stop, self.step):
-            self.start = i + self.step
+            self.start = i
             yield i
 
     def clear(self):

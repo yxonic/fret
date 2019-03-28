@@ -2,8 +2,12 @@ import functools
 import inspect
 import itertools
 import logging
+import math
+import queue
+import random
 import signal
 import sys
+import threading
 
 
 if sys.implementation.name == 'cpython':
@@ -40,6 +44,8 @@ class Configuration:
         return self._config[key]
 
     def __getattr__(self, key):
+        if key not in self._config:
+            raise AttributeError
         v = self._config[key]
         if isinstance(v, dict):
             return Configuration(v)
@@ -251,3 +257,78 @@ def nonbreak(f=None):
                 _sigint_handler(signal_received)
         except StopIteration:
             break
+
+
+@stateful('batch_size', 'index', 'pos')
+class Iterator:
+    """Iterator on data and labels, with states for save and restore."""
+
+    def __init__(self, data, *label, prefetch=False,
+                 length=None, batch_size=1, shuffle=True):
+        self.data = data
+        self.label = label
+        self.prefetch = prefetch
+        self.batch_size = batch_size
+        self.queue = queue.Queue(maxsize=8)
+        self.length = length if length is not None else len(data)
+
+        assert all(self.length == len(lab) for lab in label), \
+            'data and label must have same lengths'
+
+        self.index = list(range(len(self)))
+        if shuffle:
+            random.shuffle(self.index)
+        self.thread = None
+        self.pos = 0
+
+    def __len__(self):
+        return math.ceil(self.length / self.batch_size)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.thread is None and self.prefetch:
+            self.thread = threading.Thread(target=self.produce, daemon=True)
+            self.thread.start()
+
+        if self.pos >= len(self.index):
+            raise StopIteration
+
+        if not self.prefetch:
+            self.produce(False)
+        item = self.queue.get()
+        if isinstance(item, Exception):
+            raise item
+        else:
+            self.pos += 1
+            return item
+
+    def produce(self, daemon=True):
+        for i in range(self.pos, len(self.index)):
+            try:
+                index = self.index[i]
+
+                bs = self.batch_size
+
+                if callable(self.data):
+                    data_batch = self.data(index * bs, (index + 1) * bs)
+                else:
+                    data_batch = self.data[index * bs:(index + 1) * bs]
+
+                label_batch = [label[index * bs:(index + 1) * bs]
+                               for label in self.label]
+                if label_batch:
+                    self.queue.put([data_batch] + label_batch)
+                else:
+                    self.queue.put(data_batch)
+
+                if not daemon:
+                    return
+
+            except Exception as e:
+                if daemon:
+                    self.queue.put(e)
+                    return
+                else:
+                    raise
