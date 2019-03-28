@@ -33,6 +33,10 @@ def chapp(appdir, imp=True):
         sys.path = _path
 
 
+code0 = '''
+import nothing
+'''
+
 code1 = '''
 import fret
 
@@ -78,7 +82,19 @@ def test_main(tmpdir: py.path.local, caplog):
         main()
 
     assert caplog.text.count('no app found') == 1
+    caplog.clear()
 
+    # error test
+    appdir = tmpdir.join('appdir0')
+    appdir.mkdir()
+    with appdir.join('main.py').open('w') as f:
+        f.write(code0)
+
+    with pytest.raises(ImportError):
+        with chapp(appdir, imp=False) as app:
+            main()
+
+    # simple app test
     appdir = tmpdir.join('appdir1')
     appdir.mkdir()
 

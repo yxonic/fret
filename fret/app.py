@@ -190,8 +190,9 @@ class App:
                 try:
                     self._imp = importlib.import_module(appname)
                     break
-                except ImportError:
-                    pass
+                except ImportError as e:
+                    if e.name != appname:
+                        raise
             else:
                 logging.warning('no app found')
         return self._imp
