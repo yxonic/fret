@@ -367,6 +367,10 @@ class App:
     def command(self, f):
         name = f.__name__
         spec = funcspec(f)
+        if spec.pos and spec.pos[0] == 'ws':
+            static = False
+        else:
+            static = True
 
         @functools.wraps(f)
         def new_f(*args, **kwargs):
@@ -374,10 +378,10 @@ class App:
             global_config = self.config._get(name)
             if global_config:
                 d = global_config.copy()
-                d.update(dict(cfg[1:]))
+                d.update(dict(cfg[int(not static):]))
                 cfg = d
             else:
-                cfg = cfg[1:]
+                cfg = cfg[int(not static):]
             new_f.config = Configuration(cfg)
             return f(*args, **kwargs)
 
@@ -385,7 +389,7 @@ class App:
 
         class _Command(Command):
             def __init__(self, _, parser):
-                for arg in spec.pos[1:]:
+                for arg in spec.pos[int(not static):]:
                     parser.add_argument('-' + arg)
                 with ParserBuilder(parser, argument_style) as builder:
                     for k, v in spec.kw:
