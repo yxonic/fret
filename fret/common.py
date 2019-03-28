@@ -260,8 +260,9 @@ class Run:
             name = str(self._index)
             self._index += 1
         if name in self._states and name not in self._seen:
-            self._seen.add(name)
             obj.load_state_dict(self._states[name])
+
+        self._seen.add(name)
         self._states[name] = obj
         return obj
 
