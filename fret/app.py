@@ -30,8 +30,13 @@ class Command(abc.ABC):
 
     def _run(self, args):
         # pylint: disable=protected-access
-        ws = get_app().workspace(args.workspace)
-        del args.command, args.func, args.workspace
+        del args.command, args.func,
+        try:
+            ws = get_app().workspace(args.workspace)
+            del args.workspace
+        except AttributeError:
+            # no workspace
+            ws = None
         args = {name: value for (name, value) in args._get_kwargs()}
         args = Configuration(args)
         return self.run(ws, args)
