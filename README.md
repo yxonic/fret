@@ -111,10 +111,10 @@ def resumable(ws):
     with ws.run('exp-1') as run:
         run.register(model)
         cnt = run.acc()
-        for e in fret.nonbreak(run.range(5)):
+        for e in fret.nonbreak(run.nrange(5)):
             # with `nonbreak`, the program always finish this loop before exit
             model.value += e
-            time.sleep(0.2)
+            time.sleep(0.5)
             cnt += 1
             print('current epoch: %d, sum: %d, cnt: %d' %
                   (e, model.value, cnt))

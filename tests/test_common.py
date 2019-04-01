@@ -112,9 +112,9 @@ def test_workspace(tmpdir: py.path.local):
     assert logger == logger_
 
     # persistency: ws.run context manager
-    with ws.run('test') as run:
+    with ws.run('test-1') as run:
         rid = run.id
-        assert rid.startswith('test')
+        assert rid.startswith('test-1-')
         assert run.log().is_dir()
         assert run.result().is_dir()
         assert run.snapshot().is_dir()
@@ -128,7 +128,7 @@ def test_workspace(tmpdir: py.path.local):
             if i == 5:
                 break
 
-    with ws.run('test') as run:
+    with ws.run('test-1') as run:
         assert run.id == rid
         x = run.value(5)
         assert x == 3
@@ -137,10 +137,10 @@ def test_workspace(tmpdir: py.path.local):
         assert s.sum() == 3
 
         for i in fret.util.nonbreak(run.range(10)):
-            assert i == 5
+            assert i == 6
             break
 
-    with ws.run('test', resume=False) as run:
+    with ws.run('test-2') as run:
         assert run.id != rid
         rid = run.id
         x = run.value(5)
@@ -148,10 +148,16 @@ def test_workspace(tmpdir: py.path.local):
         s = run.acc()
         s += 2
         assert s.sum() == 2
+        for i in run.brange(10):
+            if i == 5:
+                break
 
-        for i in fret.util.nonbreak(run.range(10)):
-            assert i == 0
-            break
-
-    with ws.run('test') as run:
+    with ws.run('test-2') as run:
         assert run.id == rid
+        x = run.value(5)
+        s = run.acc()
+        s += 2
+        assert s.sum() == 4
+        for i in run.brange(10):
+            assert i == 5
+            break

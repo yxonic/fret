@@ -211,8 +211,9 @@ class Run:
         self._index = 0
         self._seen = set()  # only load once from file
         if resume:
-            ids = [filename.name for filename in ws.snapshot().iterdir()
-                   if filename.is_dir() and filename.name.startswith(tag)]
+            # TODO: accurate name search
+            ids = [fn.name for fn in ws.snapshot().iterdir()
+                   if fn.is_dir() and fn.name.startswith(tag + '-')]
             if ids:
                 self._id = max(ids)  # most recent
         if self._id is None:
@@ -284,7 +285,20 @@ class Run:
               (..., int, int), lambda self, *args: (self, None) + args,
               (..., int, int, int), lambda self, *args: (self, None) + args)
     def range(self, name, *args):
+        """Works like normal range but with position recorded. Next time start
+        from next number, as the loop is finished."""
         return self.register(name, Range(*args))
+
+    @overload((..., str, int), ...,
+              (..., str, int, int), ...,
+              (..., str, int, int, int), ...,
+              (..., int), lambda self, *args: (self, None) + args,
+              (..., int, int), lambda self, *args: (self, None) + args,
+              (..., int, int, int), lambda self, *args: (self, None) + args)
+    def brange(self, name, *args):
+        """Breakable range. Works like normal range but with position recorded.
+        Next time start from current position, as this loop isn't finished."""
+        return self.register(name, Range(*args, breakable=True))
 
     def log(self, *filename):
         path = self._ws.path.joinpath('log', self._id, *filename)
@@ -336,18 +350,19 @@ class Accumulator:
 @stateful
 class Range:
     """A stateful range object that mimics built-in ``range``."""
-    __slots__ = ['start', 'step', 'stop', '_start']
+    __slots__ = ['start', 'step', 'stop', '_start', '_breakable']
 
-    def __init__(self, *args):
+    def __init__(self, *args, breakable=False):
         r = range(*args)
         self.start = r.start
         self.step = r.step
         self.stop = r.stop
         self._start = r.start
+        self._breakable = breakable
 
     def __iter__(self):
         for i in range(self.start, self.stop, self.step):
-            self.start = i
+            self.start = i + (0 if self._breakable else self.step)
             yield i
 
     def clear(self):

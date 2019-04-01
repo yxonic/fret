@@ -30,13 +30,8 @@ class Command(abc.ABC):
 
     def _run(self, args):
         # pylint: disable=protected-access
-        del args.command, args.func,
-        try:
-            ws = get_app().workspace(args.workspace)
-            del args.workspace
-        except AttributeError:
-            # no workspace
-            ws = None
+        ws = get_app().workspace(args.workspace)
+        del args.command, args.func, args.workspace
         args = {name: value for (name, value) in args._get_kwargs()}
         args = Configuration(args)
         return self.run(ws, args)
@@ -252,8 +247,7 @@ class App:
 
         main_parser.add_argument('-q', action='store_true', help='quiet')
         main_parser.add_argument('-v', action='store_true', help='verbose')
-        if self._modules:
-            main_parser.add_argument('-w', '--workspace', help='workspace dir')
+        main_parser.add_argument('-w', '--workspace', help='workspace dir')
 
         _subparsers = main_parser.add_subparsers(title='supported commands',
                                                  dest='command')
