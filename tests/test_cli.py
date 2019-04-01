@@ -146,8 +146,8 @@ def test_main(tmpdir: py.path.local, caplog):
         model = app.main(['test'])
         assert model.weight == 23
 
-        app.main('--app app config Model'.split())
         os.environ['FRETAPP'] = 'app'
+        app.main('config Model'.split())
         model = app.main('run'.split())
         del os.environ['FRETAPP']
         assert model.config.x == 3

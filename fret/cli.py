@@ -9,7 +9,6 @@ def main(args=None):
                      :data:`sys.argv` (default: ``None``)
     """
     app = get_app()
-    app.import_modules()
     return app.main(args)
 
 

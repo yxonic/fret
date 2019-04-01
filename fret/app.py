@@ -179,8 +179,8 @@ class App:
             cfg = dict()
         self._config = Configuration(cfg)
 
-    def import_modules(self, appname=None):
-        appname = appname or os.environ.get('FRETAPP')
+    def import_modules(self):
+        appname = os.environ.get('FRETAPP')
         if appname is not None:
             self._imp = importlib.import_module(appname)
         elif 'appname' in self._config:
@@ -235,17 +235,20 @@ class App:
         return getattr(self.config, key)
 
     def main(self, args=None):
-        self.register_command(config)
-        self.register_command(clean)
+        self.import_modules()
+
+        if self._modules:
+            self.register_command(config)
+            self.register_command(clean)
 
         main_parser = _ArgumentParser(
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
             prog='fret')
 
-        main_parser.add_argument('-w', '--workspace', help='workspace dir')
         main_parser.add_argument('-q', action='store_true', help='quiet')
         main_parser.add_argument('-v', action='store_true', help='verbose')
-        main_parser.add_argument('--app', help='app name')
+        if self._modules:
+            main_parser.add_argument('-w', '--workspace', help='workspace dir')
 
         _subparsers = main_parser.add_subparsers(title='supported commands',
                                                  dest='command')
@@ -263,8 +266,6 @@ class App:
         args = main_parser.parse_args() if args is None \
             else main_parser.parse_args(args)
 
-        self.import_modules(args.app)
-
         # configure logger
         _logger = logging.getLogger()
         if args.q:
@@ -277,7 +278,6 @@ class App:
         # remove logging related options
         del args.q
         del args.v
-        del args.app
 
         logger = logging.getLogger(args.command)
         try:
