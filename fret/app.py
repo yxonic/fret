@@ -465,7 +465,7 @@ class argspec:
             kwargs['help'] = param[1]
             if len(param) == 3:
                 kwargs['choices'] = param[2]
-        elif param is not None:
+        else:
             kwargs['default'] = param
 
         if isinstance(kwargs['default'], list):
@@ -522,6 +522,8 @@ class ParserBuilder:
         prefix = '-' if self._style == 'java' else '--'
         seen = set(self._names)
         for name, spec in zip(self._names, self._spec):
+            if name.startswith('_'):
+                continue
             args, kwargs = spec.spec()
             if not args:
                 args = [prefix + name]
