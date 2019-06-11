@@ -304,7 +304,10 @@ class App:
             spec = funcspec(orig_init)
 
             if submodules is not None:
-                setattr(cls, 'submodules', submodules)
+                if isinstance(submodules, str):
+                    setattr(cls, 'submodules', submodules.split(','))
+                else:
+                    setattr(cls, 'submodules', submodules)
 
             orig_state_dict = getattr(cls, 'state_dict', lambda _: dict())
             orig_load_state_dict = getattr(cls, 'load_state_dict',

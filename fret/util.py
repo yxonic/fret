@@ -44,8 +44,10 @@ class Configuration:
         return self._config[key]
 
     def __getattr__(self, key):
+        if key == '__setstate__':
+            raise AttributeError(key)
         if key not in self._config:
-            raise AttributeError
+            raise AttributeError(key)
         v = self._config[key]
         if isinstance(v, dict):
             return Configuration(v)
