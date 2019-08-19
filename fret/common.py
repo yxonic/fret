@@ -25,8 +25,8 @@ class Workspace:
         if self.config_path.exists():
             conf = toml.load(self.config_path.open())
             for name, cfg in conf.items():
-                cls_name = cfg['module']
-                del cfg['module']
+                cls_name = cfg['__module']
+                del cfg['__module']
                 self._modules[name] = (cls_name, cfg)
         if config:
             self._modules.update(config)
@@ -90,7 +90,7 @@ class Workspace:
 
     def write(self):
         """Save module configuration of this workspace to file."""
-        cfg = {name: dict({'module': cls_name}, **cfg)
+        cfg = {name: dict({'__module': cls_name}, **cfg)
                for name, (cls_name, cfg) in self._modules.items()}
         toml.dump(cfg, self.config_path.open('w'))
 
