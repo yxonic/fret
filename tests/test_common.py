@@ -161,3 +161,14 @@ def test_workspace(tmpdir: py.path.local):
         for i in run.brange(10):
             assert i == 5
             break
+
+    with ws.run('test-2') as run:
+        x = run.value(5)
+        s = run.acc()
+        r = iter(run.brange(20))
+        first = next(r)
+        last = 0
+        for i in r:
+            last = i
+        assert first == 5
+        assert last == 19

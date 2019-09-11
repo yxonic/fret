@@ -286,7 +286,7 @@ class Run:
               (..., int, int, int), lambda self, *args: (self, None) + args)
     def range(self, name, *args):
         """Works like normal range but with position recorded. Next time start
-        from next number, as the loop is finished."""
+        from next loop, as current loop is finished."""
         return self.register(name, Range(*args))
 
     @overload((..., str, int), ...,
@@ -347,7 +347,7 @@ class Accumulator:
         return self._sum / self._cnt if self._cnt > 0 else self._sum
 
 
-@stateful
+@stateful('start', '_breakable')
 class Range:
     """A stateful range object that mimics built-in ``range``."""
     __slots__ = ['start', 'step', 'stop', '_start', '_breakable']
