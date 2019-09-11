@@ -31,6 +31,10 @@ class Workspace:
         if config:
             self._modules.update(config)
 
+    def config_dict(self):
+        return {name: dict({'__module': cls_name}, **cfg)
+                for name, (cls_name, cfg) in self._modules.items()}
+
     @property
     def path(self):
         """Workspace root path."""
@@ -90,9 +94,7 @@ class Workspace:
 
     def write(self):
         """Save module configuration of this workspace to file."""
-        cfg = {name: dict({'__module': cls_name}, **cfg)
-               for name, (cls_name, cfg) in self._modules.items()}
-        toml.dump(cfg, self.config_path.open('w'))
+        toml.dump(self.config_dict(), self.config_path.open('w'))
 
     def __enter__(self):
         return self

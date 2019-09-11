@@ -107,6 +107,7 @@ def test_workspace(tmpdir: py.path.local):
     # same ws configuration -> same build behavior
     ws = fret.workspace(str(tmpdir.join('ws')))
     main_ = ws.build(c=3)
+    assert ws.config_dict()['sub']['b'] == 4
     assert main_.sub.config.b == 4
     logger_ = ws.logger('foo')
     assert logger == logger_

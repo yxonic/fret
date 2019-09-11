@@ -37,4 +37,4 @@ _CONSOLE_HANDLER = _logging.StreamHandler()
 _CONSOLE_HANDLER.setFormatter(_LOG_FORMATTER)
 _LOGGER.addHandler(_CONSOLE_HANDLER)
 
-__version__ = '0.2.6.post1'
+__version__ = '0.2.7.post1'
