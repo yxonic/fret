@@ -266,7 +266,7 @@ class Iterator:
     """Iterator on data and labels, with states for save and restore."""
 
     def __init__(self, data, *label, prefetch=False,
-                 length=None, batch_size=1, shuffle=True):
+                 length=None, batch_size=1, shuffle=True, full_shuffle=False):
         self.data = data
         self.label = label
         self.prefetch = prefetch
@@ -278,8 +278,13 @@ class Iterator:
             'data and label must have same lengths'
 
         self.index = list(range(len(self)))
+        self.full_index = None
         if shuffle:
             random.shuffle(self.index)
+        if full_shuffle:
+            self.full_index = list(range(self.length))
+            random.shuffle(self.full_index)
+
         self.thread = None
         self.pos = 0
 
@@ -307,30 +312,65 @@ class Iterator:
             return item
 
     def produce(self, daemon=True):
-        for i in range(self.pos, len(self.index)):
-            try:
-                index = self.index[i]
+        if self.full_index:
+            for i in range(self.pos, len(self)):
+                try:
+                    bs = self.batch_size
+                    inds = self.full_index[i * bs:(i + 1) * bs]
 
-                bs = self.batch_size
+                    if callable(self.data):
+                        data_batch = [self.data(i, i + 1) for i in inds]
+                    else:
+                        data_batch = [self.data[i:i + 1] for i in inds]
 
-                if callable(self.data):
-                    data_batch = self.data(index * bs, (index + 1) * bs)
-                else:
-                    data_batch = self.data[index * bs:(index + 1) * bs]
+                    label_batch = [[label(i, i + 1) for i in inds]
+                                   if callable(label)
+                                   else [label[i:i+1] for i in inds]
+                                   for label in self.label]
 
-                label_batch = [label[index * bs:(index + 1) * bs]
-                               for label in self.label]
-                if label_batch:
-                    self.queue.put([data_batch] + label_batch)
-                else:
-                    self.queue.put(data_batch)
+                    if label_batch:
+                        self.queue.put([data_batch] + label_batch)
+                    else:
+                        self.queue.put(data_batch)
 
-                if not daemon:
-                    return
+                    if not daemon:
+                        return
 
-            except Exception as e:
-                if daemon:
-                    self.queue.put(e)
-                    return
-                else:
-                    raise
+                except Exception as e:
+                    if daemon:
+                        self.queue.put(e)
+                        return
+                    else:
+                        raise
+
+        else:
+            for i in range(self.pos, len(self)):
+                try:
+                    index = self.index[i]
+
+                    bs = self.batch_size
+
+                    if callable(self.data):
+                        data_batch = self.data(index * bs, (index + 1) * bs)
+                    else:
+                        data_batch = self.data[index * bs:(index + 1) * bs]
+
+                    label_batch = [label(index * bs, (index + 1) * bs)
+                                   if callable(label)
+                                   else label[index * bs:(index + 1) * bs]
+                                   for label in self.label]
+
+                    if label_batch:
+                        self.queue.put([data_batch] + label_batch)
+                    else:
+                        self.queue.put(data_batch)
+
+                    if not daemon:
+                        return
+
+                except Exception as e:
+                    if daemon:
+                        self.queue.put(e)
+                        return
+                    else:
+                        raise

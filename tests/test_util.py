@@ -1,4 +1,5 @@
 import fret.util
+import functools
 
 
 def test_configuration():
@@ -52,3 +53,19 @@ def test_classproperty():
     assert A.name == 'A'
     assert B.name == 'B'
     assert C.name == 'A'
+
+
+def test_iterator():
+    data = list(range(10))
+    iter1 = fret.util.Iterator(data, batch_size=3, shuffle=False)
+    assert next(iter1) == [0, 1, 2]
+
+    iter2 = fret.util.Iterator(data, batch_size=3, shuffle=True)
+    for d in iter2:
+        if len(d) == 3:
+            a, b, c = d
+            assert a + 1 == b and b + 1 == c
+
+    iter3 = fret.util.Iterator(data, batch_size=3, full_shuffle=True)
+    d = functools.reduce(lambda a, b: a + b, next(iter3))
+    assert d[1] == iter3.full_index[1]
