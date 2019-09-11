@@ -318,20 +318,20 @@ class App:
             orig_load_state_dict = getattr(cls, 'load_state_dict',
                                            lambda *_: None)
 
-            def state_dict(sf):
+            def state_dict(sf, *args, **kwargs):
                 if states:
                     d = {s: getattr(sf, s) for s in states}
                 else:
                     d = dict()
-                d.update(orig_state_dict(sf))
+                d.update(orig_state_dict(sf, *args, **kwargs))
                 return d
 
-            def load_state_dict(sf, state):
+            def load_state_dict(sf, state, *args, **kwargs):
                 if states:
                     for s in states:
                         setattr(sf, s, state[s])
                         del state[s]
-                orig_load_state_dict(sf, state)
+                orig_load_state_dict(sf, state, *args, **kwargs)
 
             @classmethod
             def add_arguments(_, parser):
