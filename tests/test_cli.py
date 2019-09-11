@@ -76,6 +76,28 @@ class Model:
         self.weight = 23
 '''
 
+code3 = '''
+import fret
+
+@fret.configurable(states=['weight'])
+def Model():
+    def __init__(self):
+        self.weight = 0
+    def train(self):
+        self.weight = 23
+'''
+
+code4 = '''
+import fret
+
+@fret.command
+class Model:
+    def __init__(self):
+        self.weight = 0
+    def train(self):
+        self.weight = 23
+'''
+
 
 def test_main(tmpdir: py.path.local, caplog):
     with pytest.raises(SystemExit):
@@ -87,12 +109,25 @@ def test_main(tmpdir: py.path.local, caplog):
     # error test
     appdir = tmpdir.join('appdir0')
     appdir.mkdir()
-    with appdir.join('main.py').open('w') as f:
-        f.write(code0)
 
-    with pytest.raises(ImportError):
-        with chapp(appdir, imp=False) as app:
-            main()
+    with chapp(appdir, imp=False) as app:
+        with appdir.join('main.py').open('w') as f:
+            f.write(code0)
+
+        with pytest.raises(ImportError):
+            app.main()
+
+        with appdir.join('main.py').open('w') as f:
+            f.write(code3)
+
+        with pytest.raises(TypeError):
+            app.main()
+
+        with appdir.join('main.py').open('w') as f:
+            f.write(code4)
+
+        with pytest.raises(TypeError):
+            app.main()
 
     # simple app test
     appdir = tmpdir.join('appdir1')

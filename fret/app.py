@@ -124,22 +124,25 @@ class clean(Command):
                             help='clear workspace logs')
         parser.add_argument('-s', dest='snapshot', action='store_true',
                             help='clear snapshots')
+        parser.add_argument('-a', action='store_true',
+                            help='clear everything except for configuration')
 
     def run(self, ws, args):
         if args.all:
             shutil.rmtree(str(ws))
         else:
-            if (not args.config and not args.log) or args.snapshot:
+            if (not args.config and not args.log) or args.snapshot or args.a:
+                # fret clean or fret clean -s ... or fret clean -a ...
                 shutil.rmtree(str(ws.snapshot()))
-            if args.snapshot:
-                shutil.rmtree(str(ws.snapshot()))
+
+            if args.log or args.a:
+                shutil.rmtree(str(ws.log()))
+
             if args.config:
                 try:
                     (ws.path / 'config.toml').unlink()
                 except FileNotFoundError:
                     pass
-            if args.log:
-                shutil.rmtree(str(ws.log()))
 
 
 class App:
@@ -300,6 +303,8 @@ class App:
     def configurable(self, wraps=None, submodules=None, states=None,
                      build_subs=True):
         def wrapper(cls):
+            if not ins.isclass(cls):
+                raise TypeError('only class can be configurable')
             orig_init = cls.__init__
             spec = funcspec(orig_init)
 
@@ -367,6 +372,8 @@ class App:
             return wrapper(wraps)
 
     def command(self, f):
+        if not ins.isfunction(f):
+            raise TypeError('only function can form command')
         name = f.__name__
         spec = funcspec(f)
         if spec.pos and spec.pos[0] == 'ws':
