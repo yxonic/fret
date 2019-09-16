@@ -2,7 +2,7 @@ import logging as _logging
 
 from .util import nonbreak, stateful
 from .util import colored as _colored
-from .app import workspace, configurable, command, argspec
+from .app import workspace, configurable, command, argspec, summarize
 
 _LOGGER = _logging.getLogger()
 _LOGGER.setLevel(_logging.INFO)

@@ -19,6 +19,56 @@ from .common import Module, Workspace
 from .util import classproperty, Configuration, colored, _dict as dict
 
 
+class argspec:
+    """In control of the behavior of commands. Represents arguments for
+    :meth:`argparse.ArgumentParser.add_argument`."""
+
+    __slots__ = ['_args', '_kwargs', '_params']
+
+    def __init__(self, *args, **kwargs):
+        self._args = args
+        self._kwargs = kwargs
+        self._params = None
+
+    @classmethod
+    def from_param(cls, param):
+        kwargs = dict()
+
+        if isinstance(param, tuple):
+            assert len(param) == 2 or len(param) == 3, \
+                'should be default, help[, choices]'
+            kwargs['default'] = param[0]
+            kwargs['help'] = param[1]
+            if len(param) == 3:
+                kwargs['choices'] = param[2]
+        else:
+            kwargs['default'] = param
+
+        if isinstance(kwargs['default'], list):
+            if kwargs['default']:
+                kwargs['nargs'] = '+'
+                kwargs['type'] = type(kwargs['default'][0])
+            else:
+                kwargs['nargs'] = '*'
+        elif isinstance(kwargs['default'], bool):
+            if kwargs['default']:
+                kwargs['action'] = 'store_false'
+            else:
+                kwargs['action'] = 'store_true'
+        elif kwargs['default'] is not None:
+            kwargs['type'] = type(kwargs['default'])
+
+        obj = cls(**kwargs)
+        obj._params = param  # pylint: disable=protected-access
+        return obj
+
+    def default(self):
+        return self._kwargs.get('default')
+
+    def spec(self):
+        return self._args, self._kwargs
+
+
 class Command(abc.ABC):
     """Command interface."""
     __slots__ = []
@@ -30,7 +80,7 @@ class Command(abc.ABC):
 
     def _run(self, args):
         # pylint: disable=protected-access
-        ws = get_app().workspace(args.workspace)
+        ws = args.workspace
         del args.command, args.func, args.workspace
         args = {name: value for (name, value) in args._get_kwargs()}
         args = Configuration(args)
@@ -56,6 +106,7 @@ class config(Command):
     help = 'configure module for workspace'
 
     def __init__(self, app, parser):
+        self.app = app
         # pylint: disable=protected-access
         parser.add_argument('name', default='main', nargs='?',
                             help='module name')
@@ -98,6 +149,7 @@ class config(Command):
             sub.set_defaults(func=save)
 
     def run(self, ws, args):
+        ws = self.app.workspace(ws)
         cfg = ws.config_path
         if cfg.exists():
             cfg = cfg.open().read().strip()
@@ -115,7 +167,8 @@ class clean(Command):
 
     help = 'clean workspace'
 
-    def __init__(self, _, parser):
+    def __init__(self, app, parser):
+        self.app = app
         parser.add_argument('--all', action='store_true',
                             help='clean the entire workspace')
         parser.add_argument('-c', dest='config', action='store_true',
@@ -128,6 +181,7 @@ class clean(Command):
                             help='clear everything except for configuration')
 
     def run(self, ws, args):
+        ws = self.app.workspace(ws)
         if args.all:
             shutil.rmtree(str(ws))
         else:
@@ -143,6 +197,19 @@ class clean(Command):
                     (ws.path / 'config.toml').unlink()
                 except FileNotFoundError:
                     pass
+
+
+def summarize(rows=(None, 'help'),
+              columns=(None, 'help'),
+              row_order=(None, ''),
+              column_order=(None, ''),
+              topk=(-1, ''),
+              with_error=(False, ''),
+              latex=(False, '')):
+    pass
+
+
+summarize.help = 'collect results and summarize'
 
 
 class App:
@@ -375,6 +442,7 @@ class App:
         if not ins.isfunction(f):
             raise TypeError('only function can form command')
         name = f.__name__
+        help = getattr(f, 'help', None)
         spec = funcspec(f)
         if spec.pos and spec.pos[0] == 'ws':
             static = False
@@ -397,7 +465,8 @@ class App:
         argument_style = self.argument_style
 
         class _Command(Command):
-            def __init__(self, _, parser):
+            def __init__(self, app, parser):
+                self.app = app
                 with ParserBuilder(parser, argument_style) as builder:
                     for arg in spec.pos[int(not static):]:
                         builder.add_opt(arg, argspec())
@@ -408,9 +477,12 @@ class App:
                 if static:
                     return new_f(**args._dict())
                 else:
+                    ws = self.app.workspace(ws)
                     return new_f(ws, **args._dict())
 
         _Command.__name__ = name
+        if help:
+            _Command.help = help
         self.register_command(_Command)
 
         return new_f
@@ -451,56 +523,6 @@ class funcspec:
         defaults.update(kwargs)
         cfg = list(zip(self.pos, args)) + list(defaults.items())
         return args, defaults, cfg
-
-
-class argspec:
-    """In control of the behavior of commands. Represents arguments for
-    :meth:`argparse.ArgumentParser.add_argument`."""
-
-    __slots__ = ['_args', '_kwargs', '_params']
-
-    def __init__(self, *args, **kwargs):
-        self._args = args
-        self._kwargs = kwargs
-        self._params = None
-
-    @classmethod
-    def from_param(cls, param):
-        kwargs = dict()
-
-        if isinstance(param, tuple):
-            assert len(param) == 2 or len(param) == 3, \
-                'should be default, help[, choices]'
-            kwargs['default'] = param[0]
-            kwargs['help'] = param[1]
-            if len(param) == 3:
-                kwargs['choices'] = param[2]
-        else:
-            kwargs['default'] = param
-
-        if isinstance(kwargs['default'], list):
-            if kwargs['default']:
-                kwargs['nargs'] = '+'
-                kwargs['type'] = type(kwargs['default'][0])
-            else:
-                kwargs['nargs'] = '*'
-        elif isinstance(kwargs['default'], bool):
-            if kwargs['default']:
-                kwargs['action'] = 'store_false'
-            else:
-                kwargs['action'] = 'store_true'
-        elif kwargs['default'] is not None:
-            kwargs['type'] = type(kwargs['default'])
-
-        obj = cls(**kwargs)
-        obj._params = param  # pylint: disable=protected-access
-        return obj
-
-    def default(self):
-        return self._kwargs.get('default')
-
-    def spec(self):
-        return self._args, self._kwargs
 
 
 class ParserBuilder:
@@ -557,6 +579,7 @@ class _ArgumentParser(argparse.ArgumentParser):
 
 
 _app = App()
+summarize = _app.command(summarize)
 
 
 def get_app():
@@ -598,4 +621,4 @@ def command(f):
 
 
 __all__ = ['get_app', 'set_global_app', 'argspec', 'App',
-           'workspace', 'configurable', 'command']
+           'workspace', 'configurable', 'command', 'summarize']
