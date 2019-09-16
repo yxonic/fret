@@ -1,14 +1,15 @@
 import argparse
 import inspect as ins
+import json
 import logging
 import pathlib
 import pickle
-from datetime import datetime
 
 import toml
 
 from .exceptions import NotConfiguredError, NoWorkspaceError
-from .util import classproperty, Configuration, stateful, overload, Iterator
+from .util import classproperty, Configuration, stateful, overload, \
+    Iterator, start_time
 # noinspection PyShadowingBuiltins
 from .util import _dict as dict  # pylint: disable=redefined-builtin
 
@@ -188,6 +189,14 @@ class Workspace:
         logger.addHandler(file_handler)
         return logger
 
+    def put(self, value, metrics, descending=False, **kwargs):
+        is_des = descending or metrics.endswith('-')
+        metrics = metrics.rstrip('+-') + ('-' if is_des else '+')
+        data = {'metrics': metrics, 'value': value}
+        data.update(kwargs)
+        with self.result(start_time + '.json-lines').open('a') as of:
+            print(json.dumps(data), file=of)
+
     def run(self, tag, resume=True):
         """Initiate a context manager that provides a persistent running
         environment. Mainly used to suspend and resume a time consuming
@@ -219,7 +228,7 @@ class Run:
             if ids:
                 self._id = max(ids)  # most recent
         if self._id is None:
-            self._id = tag + '-' + datetime.now().strftime("%Y%m%d%H%M%S")
+            self._id = tag + '-' + start_time
         if not resume:
             while ws.snapshot(self._id).exists():
                 self._id = self._id + '_'
@@ -316,6 +325,14 @@ class Run:
         path = self._ws.path.joinpath('snapshot', self._id, *filename)
         _mkdir(path, not filename or filename[-1].endswith('/'))
         return path
+
+    def put(self, value, metrics, descending=False, **kwargs):
+        is_des = descending or metrics.endswith('-')
+        metrics = metrics.rstrip('+-') + ('-' if is_des else '+')
+        data = {'metrics': metrics, 'value': value}
+        data.update(kwargs)
+        with self.result(start_time + '.json-lines').open('a') as of:
+            print(json.dumps(data), file=of)
 
 
 @stateful

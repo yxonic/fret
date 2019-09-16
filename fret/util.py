@@ -1,4 +1,5 @@
 import functools
+import importlib
 import inspect
 import itertools
 import logging
@@ -8,6 +9,7 @@ import random
 import signal
 import sys
 import threading
+from datetime import datetime
 
 
 if sys.implementation.name == 'cpython':
@@ -19,6 +21,8 @@ if sys.version_info >= _LOWEST_VERSION:
 else:
     from collections import OrderedDict
     _dict = OrderedDict
+
+start_time = datetime.now().strftime("%Y%m%d%H%M%S")
 
 
 class Configuration:
@@ -374,3 +378,71 @@ class Iterator:
                         return
                     else:
                         raise
+
+
+class Summarizer:
+    def __init__(self, data=None):
+        self.data = data or []
+        self.is_des = {}
+        try:
+            self.pd = importlib.import_module('pandas')
+        except ImportError:
+            raise ImportError('pandas needed for result summarization')
+
+    def add(self, value, metrics, **kwargs):
+        _metrics = metrics.rstrip('+-')
+        self.is_des[_metrics] = metrics.endswith('-')
+        data = {'metrics': _metrics, 'value': value}
+        data.update(kwargs)
+        self.data.append(data)
+
+    def df(self):
+        return self.pd.DataFrame(self.data)
+
+    def summarize(self, rows=None, columns=None, row_order=None,
+                  column_order=None, scheme='best'):
+        df = self.df()
+        if rows is None and columns is None:
+            columns = ['metrics']
+        if rows is None or columns is None:
+            current = set(rows or columns)
+            current.add('value')
+            groups = [c for c in df.columns if c not in current]
+            if rows is None:
+                rows = groups
+            else:
+                columns = groups
+        groups = rows + columns
+        df = df.groupby(groups)['value']
+        ind = groups.index('metrics')
+        if scheme == 'best':
+            df = df.apply(
+                lambda x: x.min() if self.is_des.get(x.name[ind])
+                else x.max()
+            )
+        elif scheme == 'mean':
+            df = df.mean()
+        elif callable(scheme):
+            df = df.apply(scheme)
+        else:
+            raise ValueError('scheme not supported')
+        df = df.unstack(columns)
+        if row_order is not None:
+            if isinstance(row_order[0], list):
+                df = df.reindex(
+                    self.pd.MultiIndex.from_product(row_order,
+                                                    names=df.rows.names),
+                    axis=0
+                )
+            else:
+                df = df.reindex(row_order, axis=0)
+        if column_order is not None:
+            if isinstance(column_order[0], list):
+                df = df.reindex(
+                    self.pd.MultiIndex.from_product(column_order,
+                                                    names=df.columns.names),
+                    axis=1
+                )
+            else:
+                df = df.reindex(column_order, axis=1)
+        return df

@@ -125,6 +125,9 @@ def test_workspace(tmpdir: py.path.local):
         s += 1
         assert s.sum() == 1
 
+        ws.put(3, 'm1')
+        run.put(3, 'm2')
+
         for i in fret.util.nonbreak(run.range(10)):
             if i == 5:
                 break
