@@ -2,8 +2,10 @@ import abc
 import argparse
 import collections
 import functools
+import glob as _glob
 import importlib
 import inspect as ins
+import json
 import logging
 import os
 import pathlib
@@ -16,7 +18,8 @@ from .exceptions import NotConfiguredError
 from .common import Module, Workspace
 # pylint: disable=redefined-builtin
 # noinspection PyShadowingBuiltins
-from .util import classproperty, Configuration, colored, _dict as dict
+from .util import classproperty, Configuration, colored, \
+    Summarizer, _dict as dict
 
 
 class argspec:
@@ -139,7 +142,7 @@ class config(Command):
                            if name in group_options[m]]
                     cfg = Configuration(cfg)
                     msg = '[%s] configured "%s" as "%s"' % \
-                        (ws, args.name, m)
+                          (ws, args.name, m)
                     if cfg._config:
                         msg += ' with: ' + str(cfg)
                     print(msg, file=sys.stderr)
@@ -158,55 +161,115 @@ class config(Command):
             raise NotConfiguredError('no configuration in this workspace')
 
 
-class clean(Command):
+# noinspection PyShadowingNames
+def clean(ws,
+          config=(False, 'remove workspace configuration'),
+          log=(False, 'clear workspace logs'),
+          snapshot=(False, 'clear snapshots'),
+          everything=argspec(
+              '-a', action='store_true',
+              help='clear everything except for configuration'
+          ),
+          all=argspec('--all', action='store_true',
+                      help='clean the entire workspace')):
     """Command ``clean``.
 
-    Remove all checkpoints in specific workspace. If ``--all`` is specified,
+    Remove all snapshots in specific workspace. If ``--all`` is specified,
     clean the entire workspace
     """
 
-    help = 'clean workspace'
+    if all:
+        shutil.rmtree(str(ws))
+    else:
+        if (not config and not log) or snapshot or everything:
+            # fret clean or fret clean -s ... or fret clean -a ...
+            shutil.rmtree(str(ws.snapshot()))
 
-    def __init__(self, app, parser):
-        self.app = app
-        parser.add_argument('--all', action='store_true',
-                            help='clean the entire workspace')
-        parser.add_argument('-c', dest='config', action='store_true',
-                            help='remove workspace configuration')
-        parser.add_argument('-l', dest='log', action='store_true',
-                            help='clear workspace logs')
-        parser.add_argument('-s', dest='snapshot', action='store_true',
-                            help='clear snapshots')
-        parser.add_argument('-a', action='store_true',
-                            help='clear everything except for configuration')
+        if log or everything:
+            shutil.rmtree(str(ws.log()))
 
-    def run(self, ws, args):
-        ws = self.app.workspace(ws)
-        if args.all:
-            shutil.rmtree(str(ws))
-        else:
-            if (not args.config and not args.log) or args.snapshot or args.a:
-                # fret clean or fret clean -s ... or fret clean -a ...
-                shutil.rmtree(str(ws.snapshot()))
-
-            if args.log or args.a:
-                shutil.rmtree(str(ws.log()))
-
-            if args.config:
-                try:
-                    (ws.path / 'config.toml').unlink()
-                except FileNotFoundError:
-                    pass
+        if config:
+            try:
+                (ws.path / 'config.toml').unlink()
+            except FileNotFoundError:
+                pass
 
 
-def summarize(rows=(None, 'help'),
-              columns=(None, 'help'),
-              row_order=(None, ''),
-              column_order=(None, ''),
-              topk=(-1, ''),
-              with_error=(False, ''),
-              latex=(False, '')):
-    pass
+def _selection_to_order(selection):
+    order = []
+    lo = 0
+    while True:
+        # noinspection PyUnresolvedReferences
+        try:
+            hi = selection.index('_', lo)
+        except ValueError:
+            # no _ left
+            order.append(selection[lo:])
+            break
+        order.append(selection[lo:hi])
+        lo = hi + 1
+    if len(order) == 1:
+        order = order[0]
+    return order
+
+
+def summarize(rows=argspec(
+            help='row names',
+            nargs='+', default=None
+        ),
+        columns=argspec(
+            help='column names',
+            nargs='+', default=None
+        ),
+        row_selection=argspec(
+            help='selection of row headers, different headers separated '
+                 'by _ (eg: -rs H1 H2 _ h1 h2)',
+            nargs='+', default=None
+        ),
+        column_selection=argspec(
+            help='selection of column headers, different headers '
+                 'separated by _ (eg: -rs C1 C2 _ c1 c2)',
+            nargs='+', default=None
+        ),
+        scheme=('best', 'output scheme',
+                ['best', 'mean', 'mean_with_error']),
+        topk=(-1, 'if >0, best k results will be taken into account'),
+        format=(None, 'float point format spec (eg: .4f)'),
+        latex=(False, 'output latex table'),
+        glob=('ws/**', 'workspace pattern')):
+    """Command ``summarize``.
+
+    Summarize all results recorded by ``ws.record``.
+    """
+    summarizer = Summarizer()
+
+    for file in _glob.glob(glob + '/*.json-lines', recursive=True):
+        for line in open(file):
+            summarizer.add(**json.loads(line))
+
+    if len(summarizer) == 0:
+        raise ValueError('no results found')
+
+    row_order = row_selection and _selection_to_order(row_selection)
+    column_order = column_selection and _selection_to_order(column_selection)
+
+    schemes = []
+    if scheme == 'mean_with_error':
+        schemes.append(lambda x: (x.mean(), x.std()))
+        spec = ':' + format if format else ''
+        fmt = r'{%s}$\pm${%s}' % (spec, spec) if latex \
+            else '{%s}±{%s}' % (spec, spec)
+        schemes.append(lambda x: fmt.format(*x))
+    else:
+        schemes.append(scheme)
+        if format:
+            fmt = '{:%s}' % format
+            schemes.append(lambda x: fmt.format(x))
+    df = summarizer.summarize(rows, columns, row_order, column_order,
+                              scheme=schemes, topk=topk)
+    if latex:
+        return df.to_latex(escape=False)
+    return df
 
 
 summarize.help = 'collect results and summarize'
@@ -273,6 +336,8 @@ class App:
         self._modules[name] = cls
 
     def register_command(self, cls, name=None):
+        if ins.isfunction(cls):
+            cls = cls._cls
         if name is None:
             name = cls.__name__
         self._commands[name] = cls
@@ -310,6 +375,7 @@ class App:
         if self._modules:
             self.register_command(config)
             self.register_command(clean)
+            self.register_command(summarize)
 
         main_parser = _ArgumentParser(
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -484,7 +550,7 @@ class App:
         if help:
             _Command.help = help
         self.register_command(_Command)
-
+        new_f._cls = _Command
         return new_f
 
 
@@ -516,7 +582,7 @@ class funcspec:
         if not self.kw_only:
             if len(args) > len(self.pos):
                 n_other = len(args) - len(self.pos)
-                defaults.update(dict([(self.kw[i][0], args[i-n_other])
+                defaults.update(dict([(self.kw[i][0], args[i - n_other])
                                       for i in range(n_other)]))
                 args = args[:-n_other]
         defaults.update(dict([(k, v.default()) for k, v in self.kw]))
@@ -527,6 +593,7 @@ class funcspec:
 
 class ParserBuilder:
     """Utility to generate CLI arguments in different styles."""
+
     def __init__(self, parser, style='java'):
         self._parser = parser
         self._style = style
@@ -579,6 +646,8 @@ class _ArgumentParser(argparse.ArgumentParser):
 
 
 _app = App()
+
+clean = _app.command(clean)
 summarize = _app.command(summarize)
 
 
@@ -621,4 +690,4 @@ def command(f):
 
 
 __all__ = ['get_app', 'set_global_app', 'argspec', 'App',
-           'workspace', 'configurable', 'command', 'summarize']
+           'workspace', 'configurable', 'command', 'clean', 'summarize']

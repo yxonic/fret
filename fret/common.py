@@ -189,7 +189,7 @@ class Workspace:
         logger.addHandler(file_handler)
         return logger
 
-    def put(self, value, metrics, descending=False, **kwargs):
+    def record(self, value, metrics, descending=False, **kwargs):
         is_des = descending or metrics.endswith('-')
         metrics = metrics.rstrip('+-') + ('-' if is_des else '+')
         data = {'metrics': metrics, 'value': value}
@@ -326,7 +326,7 @@ class Run:
         _mkdir(path, not filename or filename[-1].endswith('/'))
         return path
 
-    def put(self, value, metrics, descending=False, **kwargs):
+    def record(self, value, metrics, descending=False, **kwargs):
         is_des = descending or metrics.endswith('-')
         metrics = metrics.rstrip('+-') + ('-' if is_des else '+')
         data = {'metrics': metrics, 'value': value}

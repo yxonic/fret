@@ -10,7 +10,7 @@ import signal
 import sys
 import threading
 from datetime import datetime
-
+from collections.abc import Iterable
 
 if sys.implementation.name == 'cpython':
     _LOWEST_VERSION = (3, 6)
@@ -389,6 +389,9 @@ class Summarizer:
         except ImportError:
             raise ImportError('pandas needed for result summarization')
 
+    def __len__(self):
+        return len(self.data)
+
     def add(self, value, metrics, **kwargs):
         _metrics = metrics.rstrip('+-')
         self.is_des[_metrics] = metrics.endswith('-')
@@ -400,7 +403,7 @@ class Summarizer:
         return self.pd.DataFrame(self.data)
 
     def summarize(self, rows=None, columns=None, row_order=None,
-                  column_order=None, scheme='best'):
+                  column_order=None, scheme='best', topk=-1):
         df = self.df()
         if rows is None and columns is None:
             columns = ['metrics']
@@ -415,17 +418,27 @@ class Summarizer:
         groups = rows + columns
         df = df.groupby(groups)['value']
         ind = groups.index('metrics')
-        if scheme == 'best':
-            df = df.apply(
-                lambda x: x.min() if self.is_des.get(x.name[ind])
-                else x.max()
-            )
-        elif scheme == 'mean':
-            df = df.mean()
-        elif callable(scheme):
-            df = df.apply(scheme)
-        else:
-            raise ValueError('scheme not supported')
+
+        if isinstance(scheme, str) or not isinstance(scheme, Iterable):
+            scheme = [scheme]
+
+        def f(x):
+            if topk > 0:
+                x = x.sort_values(
+                    ascending=self.is_des.get(x.name[ind])
+                )[:topk]
+            for s in scheme:
+                if s == 'best':
+                    x = x.min() if self.is_des.get(x.name[ind]) else x.max()
+                elif s == 'mean':
+                    x = x.mean()
+                elif callable(s):
+                    x = s(x)
+                else:
+                    raise ValueError('scheme not supported')
+            return x
+
+        df = df.apply(f)
         df = df.unstack(columns)
         if row_order is not None:
             if isinstance(row_order[0], list):
