@@ -219,7 +219,7 @@ def summarize(rows=argspec(
         ),
         columns=argspec(
             help='column names',
-            nargs='+', default=None
+            nargs='*', default=None
         ),
         row_selection=argspec(
             help='selection of row headers, different headers separated '
@@ -235,15 +235,22 @@ def summarize(rows=argspec(
                 ['best', 'mean', 'mean_with_error']),
         topk=(-1, 'if >0, best k results will be taken into account'),
         format=(None, 'float point format spec (eg: .4f)'),
-        latex=(False, 'output latex table'),
-        glob=('ws/**', 'workspace pattern')):
+        to_latex=(False, 'output latex table'),
+        glob=('ws/**', 'workspace pattern'),
+        last=(False, 'only retrieve last record in each result directory')):
     """Command ``summarize``.
 
     Summarize all results recorded by ``ws.record``.
     """
     summarizer = Summarizer()
 
-    for file in _glob.glob(glob + '/*.json-lines', recursive=True):
+    last_dirname = None
+    for file in sorted(_glob.glob(glob + '/*.json-lines', recursive=True),
+                       reverse=True):
+        if last_dirname != os.path.dirname(file):
+            last_dirname = os.path.dirname(file)
+        elif last:
+            continue
         for line in open(file):
             summarizer.add(**json.loads(line))
 
@@ -257,7 +264,7 @@ def summarize(rows=argspec(
     if scheme == 'mean_with_error':
         schemes.append(lambda x: (x.mean(), x.std()))
         spec = ':' + format if format else ''
-        fmt = r'{%s}$\pm${%s}' % (spec, spec) if latex \
+        fmt = r'{%s}$\pm${%s}' % (spec, spec) if to_latex \
             else '{%s}±{%s}' % (spec, spec)
         schemes.append(lambda x: fmt.format(*x))
     else:
@@ -267,7 +274,7 @@ def summarize(rows=argspec(
             schemes.append(lambda x: fmt.format(x))
     df = summarizer.summarize(rows, columns, row_order, column_order,
                               scheme=schemes, topk=topk)
-    if latex:
+    if to_latex:
         return df.to_latex(escape=False)
     return df
 
