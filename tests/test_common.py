@@ -126,7 +126,6 @@ def test_workspace(tmpdir: py.path.local):
         assert s.sum() == 1
 
         ws.record(3, 'm1')
-        run.record(3, 'm2')
 
         for i in fret.util.nonbreak(run.range(10)):
             if i == 5:

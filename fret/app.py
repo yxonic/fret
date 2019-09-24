@@ -2,10 +2,8 @@ import abc
 import argparse
 import collections
 import functools
-import glob as _glob
 import importlib
 import inspect as ins
-import json
 import logging
 import os
 import pathlib
@@ -19,7 +17,7 @@ from .common import Module, Workspace
 # pylint: disable=redefined-builtin
 # noinspection PyShadowingBuiltins
 from .util import classproperty, Configuration, colored, \
-    Summarizer, _dict as dict
+    collect, _dict as dict
 
 
 class argspec:
@@ -195,6 +193,9 @@ def clean(ws,
                 pass
 
 
+clean.help = 'clean workspace'
+
+
 def _selection_to_order(selection):
     order = []
     lo = 0
@@ -243,18 +244,7 @@ def summarize(
 
     Summarize all results recorded by ``ws.record``.
     """
-    summarizer = Summarizer()
-
-    last_dirname = None
-    for file in sorted(_glob.glob(glob + '/*.json-lines', recursive=True),
-                       reverse=True):
-        if last_dirname != os.path.dirname(file):
-            last_dirname = os.path.dirname(file)
-        elif last:
-            continue
-        for line in open(file):
-            summarizer.add(**json.loads(line))
-
+    summarizer = collect(glob, last)
     if len(summarizer) == 0:
         raise ValueError('no results found')
 
@@ -514,7 +504,7 @@ class App:
         else:
             return wrapper(wraps)
 
-    def command(self, f):
+    def command(self, f, register=True):
         if not ins.isfunction(f):
             raise TypeError('only function can form command')
         name = f.__name__
@@ -559,7 +549,8 @@ class App:
         _Command.__name__ = name
         if help:
             _Command.help = help
-        self.register_command(_Command)
+        if register:
+            self.register_command(_Command)
         new_f._cls = _Command
         return new_f
 
@@ -656,9 +647,8 @@ class _ArgumentParser(argparse.ArgumentParser):
 
 
 _app = App()
-
-clean = _app.command(clean)
-summarize = _app.command(summarize)
+clean = _app.command(clean, register=False)
+summarize = _app.command(summarize, register=False)
 
 
 def get_app():

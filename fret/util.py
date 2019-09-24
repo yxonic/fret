@@ -2,13 +2,16 @@ import functools
 import importlib
 import inspect
 import itertools
+import json
 import logging
 import math
+import os
 import queue
 import random
 import signal
 import sys
 import threading
+import glob as _glob
 from datetime import datetime
 from collections.abc import Iterable
 
@@ -380,14 +383,24 @@ class Iterator:
                         raise
 
 
+def collect(glob, last=False):
+    summarizer = Summarizer()
+
+    last_dirname = None
+    for file in sorted(_glob.glob(glob + '/*.json-lines', recursive=True),
+                       reverse=True):
+        if last_dirname != os.path.dirname(file):
+            last_dirname = os.path.dirname(file)
+        elif last:
+            continue
+        for line in open(file):
+            summarizer.add(**json.loads(line))
+
+
 class Summarizer:
     def __init__(self, data=None):
         self.data = data or []
         self.is_des = {}
-        try:
-            self.pd = importlib.import_module('pandas')
-        except ImportError:
-            raise ImportError('pandas needed for result summarization')
 
     def __len__(self):
         return len(self.data)
@@ -400,11 +413,18 @@ class Summarizer:
         self.data.append(data)
 
     def df(self):
-        return self.pd.DataFrame(self.data)
+        try:
+            pd = importlib.import_module('pandas')
+        except ImportError:
+            raise ImportError('pandas needed for result summarization')
+        return pd.DataFrame(self.data)
 
     def summarize(self, rows=None, columns=None, row_order=None,
-                  column_order=None, scheme='best', topk=-1):
+                  column_order=None, scheme='best', topk=-1, filter=None):
         df = self.df()
+        pd = importlib.import_module('pandas')
+        if filter is not None:
+            df = filter(df)
         if rows is None and columns is None:
             columns = ['metrics']
         if rows is None or columns is None:
@@ -443,8 +463,8 @@ class Summarizer:
         if row_order is not None:
             if isinstance(row_order[0], list):
                 df = df.reindex(
-                    self.pd.MultiIndex.from_product(row_order,
-                                                    names=df.rows.names),
+                    pd.MultiIndex.from_product(row_order,
+                                               names=df.rows.names),
                     axis=0
                 )
             else:
@@ -452,8 +472,8 @@ class Summarizer:
         if column_order is not None:
             if isinstance(column_order[0], list):
                 df = df.reindex(
-                    self.pd.MultiIndex.from_product(column_order,
-                                                    names=df.columns.names),
+                    pd.MultiIndex.from_product(column_order,
+                                               names=df.columns.names),
                     axis=1
                 )
             else:

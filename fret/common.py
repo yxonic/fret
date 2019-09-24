@@ -34,21 +34,20 @@ class Workspace:
             else:
                 conf.update(config_dict)
 
+        self._config_dict = None
         if conf is not None:
             self._config_dict = copy.deepcopy(conf)
             for name, cfg in conf.items():
                 cls_name = cfg['__module']
                 del cfg['__module']
                 self._modules[name] = (cls_name, cfg)
+
         if config:
             self._modules.update(config)
 
     def config_dict(self):
-        if not self._config_dict:
-            self._config_dict = \
-                {name: dict({'__module': cls_name}, **cfg)
-                 for name, (cls_name, cfg) in self._modules.items()}
-        return self._config_dict
+        return {name: dict({'__module': cls_name}, **cfg)
+                for name, (cls_name, cfg) in self._modules.items()}
 
     @property
     def path(self):
