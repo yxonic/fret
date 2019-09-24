@@ -213,7 +213,8 @@ def _selection_to_order(selection):
     return order
 
 
-def summarize(rows=argspec(
+def summarize(
+        rows=argspec(
             help='row names',
             nargs='+', default=None
         ),
@@ -235,7 +236,7 @@ def summarize(rows=argspec(
                 ['best', 'mean', 'mean_with_error']),
         topk=(-1, 'if >0, best k results will be taken into account'),
         format=(None, 'float point format spec (eg: .4f)'),
-        to_latex=(False, 'output latex table'),
+        output=(None, 'output format', ['html', 'latex']),
         glob=('ws/**', 'workspace pattern'),
         last=(False, 'only retrieve last record in each result directory')):
     """Command ``summarize``.
@@ -264,7 +265,7 @@ def summarize(rows=argspec(
     if scheme == 'mean_with_error':
         schemes.append(lambda x: (x.mean(), x.std()))
         spec = ':' + format if format else ''
-        fmt = r'{%s}$\pm${%s}' % (spec, spec) if to_latex \
+        fmt = r'{%s}$\pm${%s}' % (spec, spec) if output == 'latex' \
             else '{%s}±{%s}' % (spec, spec)
         schemes.append(lambda x: fmt.format(*x))
     else:
@@ -274,8 +275,10 @@ def summarize(rows=argspec(
             schemes.append(lambda x: fmt.format(x))
     df = summarizer.summarize(rows, columns, row_order, column_order,
                               scheme=schemes, topk=topk)
-    if to_latex:
+    if output == 'latex':
         return df.to_latex(escape=False)
+    if output == 'html':
+        return df.to_html(escape=False)
     return df
 
 
