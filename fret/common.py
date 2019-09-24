@@ -1,4 +1,5 @@
 import argparse
+import copy
 import inspect as ins
 import json
 import logging
@@ -19,12 +20,22 @@ class Workspace:
     with specific configuration, save snapshots, open results, etc., using
     workspace objects."""
 
-    def __init__(self, app, path, config=None):
+    def __init__(self, app, path, config=None, config_dict=None):
         self._app = app
         self._path = pathlib.Path(path)
         self._modules = dict()
+
+        conf = None
         if self.config_path.exists():
             conf = toml.load(self.config_path.open())
+        if config_dict is not None:
+            if conf is None:
+                conf = config_dict
+            else:
+                conf.update(config_dict)
+
+        if conf is not None:
+            self._config_dict = copy.deepcopy(conf)
             for name, cfg in conf.items():
                 cls_name = cfg['__module']
                 del cfg['__module']
@@ -33,8 +44,11 @@ class Workspace:
             self._modules.update(config)
 
     def config_dict(self):
-        return {name: dict({'__module': cls_name}, **cfg)
-                for name, (cls_name, cfg) in self._modules.items()}
+        if not self._config_dict:
+            self._config_dict = \
+                {name: dict({'__module': cls_name}, **cfg)
+                 for name, (cls_name, cfg) in self._modules.items()}
+        return self._config_dict
 
     @property
     def path(self):
@@ -142,7 +156,7 @@ class Workspace:
         Args:
             tag (str or pathlib.Path) : snapshot tag or path."""
         # pylint: disable=protected-access
-        env = self._modules
+        env = self.config_dict()
         args = obj.spec._dict() if hasattr(obj, 'spec') else dict()
         state = obj.state_dict()
         if isinstance(tag, str) and not tag.endswith('.pt'):
@@ -163,7 +177,7 @@ class Workspace:
         else:
             f = pathlib.Path(tag)
         state = pickle.load(f.open('rb'))
-        last_ws = Workspace(self._app, self._path, state['env'])
+        last_ws = Workspace(self._app, self._path, config_dict=state['env'])
         obj = last_ws.build(name, **state['args'])
         obj.load_state_dict(state['state'])
         return obj
@@ -192,8 +206,15 @@ class Workspace:
     def record(self, value, metrics, descending=False, **kwargs):
         is_des = descending or metrics.endswith('-')
         metrics = metrics.rstrip('+-') + ('-' if is_des else '+')
-        data = {'metrics': metrics, 'value': value}
+
+        data = {}
+        for name, cfg in self.config_dict().items():
+            for k, v in cfg.items():
+                data[name + '.' + k] = v
+
+        data.update({'metrics': metrics, 'value': value})
         data.update(kwargs)
+
         with self.result(start_time + '.json-lines').open('a') as of:
             print(json.dumps(data), file=of)
 
