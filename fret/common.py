@@ -347,14 +347,6 @@ class Run:
         _mkdir(path, not filename or filename[-1].endswith('/'))
         return path
 
-    def record(self, value, metrics, descending=False, **kwargs):
-        is_des = descending or metrics.endswith('-')
-        metrics = metrics.rstrip('+-') + ('-' if is_des else '+')
-        data = {'metrics': metrics, 'value': value}
-        data.update(kwargs)
-        with self.result(start_time + '.json-lines').open('a') as of:
-            print(json.dumps(data), file=of)
-
 
 @stateful
 class Accumulator:
