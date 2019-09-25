@@ -60,7 +60,8 @@ def test_iterator():
     iter1 = fret.util.Iterator(data, batch_size=3, shuffle=False)
     assert next(iter1) == [0, 1, 2]
 
-    iter2 = fret.util.Iterator(data, batch_size=3, shuffle=True)
+    iter2 = fret.util.Iterator(data, batch_size=3,
+                               shuffle=True, prefetch=True)
     for d in iter2:
         if len(d) == 3:
             a, b, c = d
@@ -69,3 +70,7 @@ def test_iterator():
     iter3 = fret.util.Iterator(data, batch_size=3, full_shuffle=True)
     d = functools.reduce(lambda a, b: a + b, next(iter3))
     assert d[1] == iter3.full_index[1]
+
+    iter4 = fret.util.Iterator(data, prefetch=True)
+    assert next(iter4) == 0
+    assert next(iter4) == 1

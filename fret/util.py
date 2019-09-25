@@ -273,7 +273,8 @@ class Iterator:
     """Iterator on data and labels, with states for save and restore."""
 
     def __init__(self, data, *label, prefetch=False,
-                 length=None, batch_size=1, shuffle=True, full_shuffle=False):
+                 length=None, batch_size=None, shuffle=True,
+                 full_shuffle=False):
         self.data = data
         self.label = label
         self.prefetch = prefetch
@@ -296,6 +297,8 @@ class Iterator:
         self.pos = 0
 
     def __len__(self):
+        if self.batch_size is None:
+            return self.length
         return math.ceil(self.length / self.batch_size)
 
     def __iter__(self):
@@ -319,6 +322,27 @@ class Iterator:
             return item
 
     def produce(self, daemon=True):
+        if self.batch_size is None:
+            # no batch, direct indexing
+            try:
+                for i in range(self.pos, self.length):
+                    data = self.data[i]
+                    label = [label[i] for label in self.label]
+                    if label:
+                        self.queue.put([data] + label)
+                    else:
+                        self.queue.put(data)
+
+                    if not daemon:
+                        return
+
+            except Exception as e:
+                if daemon:
+                    self.queue.put(e)
+                    return
+                else:
+                    raise
+
         if self.full_index:
             for i in range(self.pos, len(self)):
                 try:
