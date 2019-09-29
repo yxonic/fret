@@ -288,7 +288,7 @@ class App:
             if p.joinpath('fret.toml').exists():
                 path = str(p)
             else:
-                while p != pathlib.Path(p.root):
+                while p != p.parent:
                     if p.joinpath('fret.toml').exists():
                         path = str(p)
                         self._cwd = os.getcwd()
