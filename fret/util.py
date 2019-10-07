@@ -420,6 +420,8 @@ def collect(glob, last=False):
         for line in open(file):
             summarizer.add(**json.loads(line))
 
+    return summarizer
+
 
 class Summarizer:
     def __init__(self, data=None):
