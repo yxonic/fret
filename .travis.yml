@@ -20,8 +20,8 @@ matrix:
       env: PATH=/c/Python37:/c/Python37/Scripts:$PATH
 
 install:
-  - pip3 install -e .[test]
-  - pip3 install coveralls
+  - pip install -e .[test]
+  - pip install coveralls
 
 script:
   - pytest
