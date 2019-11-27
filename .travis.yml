@@ -8,20 +8,20 @@ matrix:
     - python: 3.7
       dist: xenial
       sudo: true
-    - name: "Python 3.7.4 on macOS"
+    - name: "Python 3.7.5 on macOS"
       os: osx
       osx_image: xcode11
       language: shell
-    - name: "Python 3.7.4 on Windows"
+    - name: "Python 3.7.5 on Windows"
       os: windows
       language: shell
       before_install:
-        - choco install python
+        - choco install python --version 3.7.5
       env: PATH=/c/Python37:/c/Python37/Scripts:$PATH
 
 install:
-  - pip install -e .[test]
-  - pip install coveralls
+  - pip3 install -e .[test]
+  - pip3 install coveralls
 
 script:
   - pytest
