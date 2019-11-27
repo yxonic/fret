@@ -426,7 +426,7 @@ def collect(glob, last=False):
 class Summarizer:
     def __init__(self, data=None):
         self.data = data or []
-        self.is_des = {}
+        self.is_des = _dict()
 
     def __len__(self):
         return len(self.data)
@@ -434,7 +434,7 @@ class Summarizer:
     def add(self, value, metrics, **kwargs):
         _metrics = metrics.rstrip('+-')
         self.is_des[_metrics] = metrics.endswith('-')
-        data = {'metrics': _metrics, 'value': value}
+        data = _dict(metrics=_metrics, value=value)
         data.update(kwargs)
         self.data.append(data)
 
@@ -451,6 +451,7 @@ class Summarizer:
         pd = importlib.import_module('pandas')
         if filter is not None:
             df = filter(df)
+        df = df.fillna('-')
         if rows is None and columns is None:
             columns = ['metrics']
         if rows is None or columns is None:

@@ -328,6 +328,9 @@ class App:
                         raise
             else:
                 logging.warning('no app found')
+        if 'import_modules' in self._config:
+            for m in self._config.import_modules:
+                importlib.import_module(m)
         return self._imp
 
     def register_module(self, cls, name=None):
@@ -424,7 +427,8 @@ class App:
             logger.warning('cancelled by user')
         except NotConfiguredError as e:
             print('error:', e)
-            subparsers['config'].print_usage()
+            if 'config' in subparsers:
+                subparsers['config'].print_usage()
             sys.exit(1)
         except Exception as e:  # pylint: disable=broad-except
             # print traceback info to screen only
