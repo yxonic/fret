@@ -1,5 +1,4 @@
 import fret.util
-import functools
 
 
 def test_configuration():
@@ -68,7 +67,7 @@ def test_iterator():
             assert a + 1 == b and b + 1 == c
 
     iter3 = fret.util.Iterator(data, batch_size=3, full_shuffle=True)
-    d = functools.reduce(lambda a, b: a + b, next(iter3))
+    d = next(iter3)
     assert d[1] == iter3.full_index[1]
 
     iter4 = fret.util.Iterator(data, prefetch=True)

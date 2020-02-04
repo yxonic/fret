@@ -37,4 +37,7 @@ _CONSOLE_HANDLER = _logging.StreamHandler()
 _CONSOLE_HANDLER.setFormatter(_LOG_FORMATTER)
 _LOGGER.addHandler(_CONSOLE_HANDLER)
 
-__version__ = '0.2.8.beta5'
+__all__ = ['nonbreak', 'stateful', 'workspace', 'configurable', 'command',
+           'argspec', 'clean', 'summarize']
+
+__version__ = '0.2.8'

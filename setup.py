@@ -11,7 +11,7 @@ with open('README.md') as f:
 test_deps = [
     'pytest>=4',
     'pytest-cov>=2.6.0',
-    'pytest-pep8>=1',
+    'pytest-flake8>=1',
 ]
 doc_deps = [
     'sphinx',
