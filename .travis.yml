@@ -21,8 +21,7 @@ matrix:
 
 install:
   - pip3 install -e .[test]
-  - pip3 install coveralls
 
 script:
   - pytest
-  - COVERALLS_PARALLEL=true coveralls
+  - CODECOV_TOKEN="fb15f8d9-5fde-430c-ba91-aee5c0189fe8" bash <(curl -s https://codecov.io/bash)
