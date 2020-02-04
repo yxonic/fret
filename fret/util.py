@@ -349,14 +349,9 @@ class Iterator:
                     bs = self.batch_size
                     inds = self.full_index[i * bs:(i + 1) * bs]
 
-                    if callable(self.data):
-                        data_batch = [self.data(i, i + 1) for i in inds]
-                    else:
-                        data_batch = [self.data[i:i + 1] for i in inds]
+                    data_batch = [self.data[i] for i in inds]
 
-                    label_batch = [[label(i, i + 1) for i in inds]
-                                   if callable(label)
-                                   else [label[i:i+1] for i in inds]
+                    label_batch = [[label[i] for i in inds]
                                    for label in self.label]
 
                     if label_batch:
