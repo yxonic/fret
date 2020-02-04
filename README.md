@@ -1,7 +1,7 @@
 # fret
 
 [![Travis (.org)](https://img.shields.io/travis/yxonic/fret.svg)](https://travis-ci.org/yxonic/fret)
-[![Codecov](https://img.shields.io/codecov/c/gh/yxonic/fret?token=fb15f8d9-5fde-430c-ba91-aee5c0189fe8)](https://codecov.io/gh/yxonic/fret)
+[![Codecov](https://img.shields.io/codecov/c/gh/yxonic/fret?token=3738c9f816aa4a31be83fd12402149f9)](https://codecov.io/gh/yxonic/fret)
 [![Documentation Status](https://readthedocs.org/projects/fret/badge/?version=latest)](https://fret.readthedocs.io/en/latest/?badge=latest)
 [![PyPI](https://img.shields.io/pypi/v/fret.svg)](https://pypi.python.org/pypi/fret)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/fret.svg)](https://pypi.python.org/pypi/fret)
