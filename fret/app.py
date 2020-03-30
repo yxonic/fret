@@ -159,6 +159,48 @@ class config(Command):
             raise NotConfiguredError('no configuration in this workspace')
 
 
+class fork(Command):
+    """Command ``fork``,
+
+    Fork from existing workspace and change some of the arguments.
+
+    Example:
+        .. code-block:: bash
+
+            $ fret fork ws/test main.foo=6
+            In [ws/test]: as in [ws/_default], with modification(s): main.foo=6
+    """
+
+    help = 'fork workspace, possibly with modifications'
+
+    def __init__(self, app, parser):
+        self.app = app
+        parser.add_argument('path', help='path for new workspace')
+        parser.add_argument('mods', nargs='*', default=[],
+                            help='modifications (in format: NAME.ARG=VAL)')
+
+    def run(self, ws, args):
+        ws = self.app.workspace(ws)
+        conf = ws.config_dict()
+        for mod in args.mods:
+            k, v = mod.split('=')
+            d = conf
+            if '.' not in k:
+                k = 'main.' + k
+            fields = k.split('.')
+            try:
+                for field in fields[:-1]:
+                    d = d[field]
+                d[fields[-1]]  # try get last field
+            except KeyError as e:
+                print('{}: no such key to modify'.format(e.args[0]))
+                return
+            d[fields[-1]] = v
+
+        ws_ = self.app.workspace(args.path, config_dict=conf)
+        ws_.write()
+
+
 # noinspection PyShadowingNames
 def clean(ws,
           config=(False, 'remove workspace configuration'),
@@ -363,11 +405,11 @@ class App:
             return 'java'
         return style
 
-    def workspace(self, path=None):
+    def workspace(self, path=None, **kwargs):
         if path is None:
             path = pathlib.Path(self._cwd).relative_to(self._root) if \
                 self._cwd is not None else 'ws/_default'
-        return Workspace(self, path)
+        return Workspace(self, path, **kwargs)
 
     def __getattr__(self, key):
         return getattr(self.config, key)
@@ -377,6 +419,7 @@ class App:
 
         if self._modules:
             self.register_command(config)
+            self.register_command(fork)
             self.register_command(clean)
             self.register_command(summarize)
 
@@ -666,13 +709,13 @@ def set_global_app(app):
     _app = app
 
 
-def workspace(path=None):
+def workspace(path=None, **kwargs):
     """Build workspace within current app.
 
     Args:
         path (str) : workspace path (default: ``None``)
     """
-    return get_app().workspace(path)
+    return get_app().workspace(path, **kwargs)
 
 
 def configurable(wraps=None, submodules=None, build_subs=True, states=None):

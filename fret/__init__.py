@@ -40,4 +40,4 @@ _LOGGER.addHandler(_CONSOLE_HANDLER)
 __all__ = ['nonbreak', 'stateful', 'workspace', 'configurable', 'command',
            'argspec', 'clean', 'summarize']
 
-__version__ = '0.2.8'
+__version__ = '0.2.9'
