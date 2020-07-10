@@ -161,7 +161,7 @@ class Workspace:
             f = self.snapshot(obj.build_name + '.' + tag + '.pt')
         else:
             f = pathlib.Path(tag)
-        pickle.dump({'env': env, 'args': args, 'state': state}, f.open('wb'))
+        pickle.dump({'env': env, 'args': args, 'state': state}, str(f))
 
     @overload((..., str, ...), ...,
               (..., ...), lambda self, t: (self, 'main', t))
@@ -174,7 +174,7 @@ class Workspace:
             f = self.snapshot(name + '.' + tag + '.pt')
         else:
             f = pathlib.Path(tag)
-        state = pickle.load(f.open('rb'))
+        state = pickle.load(str(f))
         last_ws = Workspace(self._app, self._path, config_dict=state['env'])
         obj = last_ws.build(name, **state['args'])
         obj.load_state_dict(state['state'])
@@ -257,7 +257,7 @@ class Run:
         # load state if possible
         state_file = self._ws.snapshot(self._id, '.states.pt')
         if state_file.exists():
-            self._states = pickle.load(state_file.open('rb'))
+            self._states = pickle.load(str(state_file))
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -265,7 +265,7 @@ class Run:
         for k in self._states:
             if hasattr(self._states[k], 'state_dict'):
                 self._states[k] = self._states[k].state_dict()
-        pickle.dump(self._states, state_file.open('wb'))
+        pickle.dump(self._states, str(state_file))
 
     @property
     def id(self):
