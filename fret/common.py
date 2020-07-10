@@ -202,8 +202,9 @@ class Workspace:
         logger.addHandler(file_handler)
         return logger
 
-    def record(self, value, metrics, descending=False, **kwargs):
-        is_des = descending or metrics.endswith('-')
+    def record(self, value, metrics, descending=None, **kwargs):
+        is_des = descending is True or \
+            (descending is None and metrics.endswith('-'))
         metrics = metrics.rstrip('+-') + ('-' if is_des else '+')
 
         data = {}
