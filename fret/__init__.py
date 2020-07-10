@@ -1,6 +1,6 @@
 import logging as _logging
 
-from .util import nonbreak, stateful
+from .util import nonbreak, stateful, set_saver, set_loader
 from .util import colored as _colored
 from .app import workspace, configurable, command, argspec, clean, summarize
 
@@ -38,6 +38,6 @@ _CONSOLE_HANDLER.setFormatter(_LOG_FORMATTER)
 _LOGGER.addHandler(_CONSOLE_HANDLER)
 
 __all__ = ['nonbreak', 'stateful', 'workspace', 'configurable', 'command',
-           'argspec', 'clean', 'summarize']
+           'argspec', 'clean', 'summarize', 'set_saver', 'set_loader']
 
-__version__ = '0.2.9'
+__version__ = '0.2.10'

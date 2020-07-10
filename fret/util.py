@@ -6,6 +6,7 @@ import json
 import logging
 import math
 import os
+import pickle as _pickle
 import queue
 import random
 import signal
@@ -26,6 +27,27 @@ else:
     _dict = OrderedDict
 
 start_time = datetime.now().strftime("%Y%m%d%H%M%S")
+
+
+class pickle:
+    saver = _pickle.dump
+    loader = _pickle.load
+
+    @staticmethod
+    def load(f):
+        return pickle.loader(f)
+
+    @staticmethod
+    def dump(obj, f):
+        pickle.saver(obj, f)
+
+
+def set_saver(saver):
+    pickle.saver = saver
+
+
+def set_loader(loader):
+    pickle.loader = loader
 
 
 class Configuration:

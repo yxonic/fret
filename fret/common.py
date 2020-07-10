@@ -4,13 +4,12 @@ import inspect as ins
 import json
 import logging
 import pathlib
-import pickle
 
 import toml
 
 from .exceptions import NotConfiguredError, NoWorkspaceError
 from .util import classproperty, Configuration, stateful, overload, \
-    Iterator, start_time
+    Iterator, start_time, pickle
 # noinspection PyShadowingBuiltins
 from .util import _dict as dict  # pylint: disable=redefined-builtin
 
