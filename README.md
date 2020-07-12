@@ -190,8 +190,10 @@ foo='bar'
 ```
 
 ## fret 0.3
-- [ ] No confusing overloads. Be explicit.
-- [ ] App launch optimization.
+- [ ] Stablize programming API (around workspace).
 - [ ] Workspace runtime.
 - [ ] Better result recording and querying using db.
+- [ ] No confusing overloads. Be explicit.
+- [ ] `App` is specialized for command line use.
+- [ ] CLI launch optimization.
 - [ ] Windows support.
