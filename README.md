@@ -188,3 +188,10 @@ B(bar=0, foo='baz', sth=3)
 >>> config
 foo='bar'
 ```
+
+## fret 0.3
+- [ ] No confusing overloads. Be explicit.
+- [ ] App launch optimization.
+- [ ] Workspace runtime.
+- [ ] Better result recording and querying using db.
+- [ ] Windows support.
