@@ -1,8 +1,224 @@
+import argparse
+import collections
+import logging
 import shutil
+import sys
 
-from .common import command, argspec
+from .common import command, argspec, commands, configurables, \
+    NoAppError, NotConfiguredError
 from .workspace import Workspace
-from .util import collect
+from .util import collect, colored, ColoredFormatter, Configuration
+
+
+def main(args=None):
+    logger = logging.getLogger('fret')
+    logger.setLevel(logging.INFO)
+    formatter = ColoredFormatter(
+        '%(levelname)s %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    handler = logging.StreamHandler()
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
+    try:
+        from . import app
+        argument_style = app.config._get('argument_style') or 'java'
+    except NoAppError:
+        app = None
+        argument_style = 'java'
+
+    main_parser = _ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        prog='fret')
+
+    main_parser.add_argument('-q', action='store_true', help='quiet')
+    main_parser.add_argument('-v', action='store_true', help='verbose')
+    main_parser.add_argument('-w', '--workspace', help='workspace dir',
+                             default='ws/_default')
+
+    subparsers = main_parser.add_subparsers(title='supported commands',
+                                            dest='command')
+    subparsers.required = True
+
+    for cmd, f in commands.items():
+        sub = subparsers.add_parser(
+            cmd, help=getattr(f, '__help__', 'command ' + cmd),
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+        with ParserBuilder(sub, argument_style) as builder:
+            for arg in f.__funcspec__.pos[int(not f.__static__):]:
+                builder.add_opt(arg, argspec())
+            for k, v in f.__funcspec__.kw:
+                builder.add_opt(k, v)
+
+        sub.set_defaults(func=_default_func(f))
+
+    if app is not None:
+        config_sub = subparsers.add_parser(
+            'config', help='configure module for workspace',
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+        _add_config_sub(config_sub, argument_style)
+        config_sub.set_defaults(func=_config_default_func)
+    else:
+        config_sub = None
+
+    args = main_parser.parse_args() if args is None \
+        else main_parser.parse_args(args)
+
+    # configure logging level
+    if args.q:
+        logger.setLevel(logging.WARNING)
+    elif args.v:
+        logger.setLevel(logging.DEBUG)
+    else:
+        logger.setLevel(logging.INFO)
+
+    # remove logging related options
+    del args.q
+    del args.v
+
+    logger = logging.getLogger('fret.' + args.command)
+    try:
+        return args.func(args)
+    except KeyboardInterrupt:
+        # print traceback info to screen only
+        import traceback
+        sys.stderr.write(traceback.format_exc())
+        logger.warning('cancelled by user')
+    except NotConfiguredError as e:
+        print('error:', e)
+        if config_sub is not None:
+            config_sub.print_usage()
+        sys.exit(1)
+    except Exception as e:  # pylint: disable=broad-except
+        # print traceback info to screen only
+        import traceback
+        sys.stderr.write(traceback.format_exc())
+        logger.error('exception occurred: %s: %s',
+                     e.__class__.__name__, e)
+
+
+class _ArgumentParser(argparse.ArgumentParser):
+    def error(self, message):
+        # customize error message
+        self.print_usage(sys.stderr)
+        err = colored('error:', 'r', style='b')
+        self.exit(2, '%s %s\n' % (err, message))
+
+
+class ParserBuilder:
+    """Utility to generate CLI arguments in different styles."""
+
+    def __init__(self, parser, style='java'):
+        self._parser = parser
+        self._style = style
+        self._names = []
+        self._spec = []
+
+    def add_opt(self, name, spec):
+        """Add option with specification.
+
+        Args:
+            name (str) : option name
+            spec (argspec): argument specification"""
+
+        if spec.default() is True:
+            # change name for better bool support
+            spec._kwargs['dest'] = name  # pylint: disable=protected-access
+            name = 'no_' + name
+        self._names.append(name)
+        self._spec.append(spec)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        prefix = '-' if self._style == 'java' else '--'
+        seen = set(self._names)
+        for name, spec in zip(self._names, self._spec):
+            if name.startswith('_'):
+                continue
+            args, kwargs = spec.spec()
+            if not args:
+                args = [prefix + name]
+                short = ''.join(seg[0] for seg in name.split('_'))
+                if short not in seen:
+                    args.append('-' + short)
+                    seen.add(short)
+            else:
+                kwargs['dest'] = name
+            if 'help' not in kwargs:
+                kwargs['help'] = 'parameter ' + name
+            self._parser.add_argument(*args, **kwargs)
+
+
+def _default_func(f):
+    def run(args):
+        ws = args.workspace
+        del args.command, args.func, args.workspace
+        args = {name: value for (name, value) in args._get_kwargs()}
+        args = Configuration(args)
+
+        if f.__static__:
+            return f(**args._dict())
+        else:
+            ws = Workspace(ws)
+            return f(ws, **args._dict())
+    return run
+
+
+def _add_config_sub(parser, argument_style):
+    parser.add_argument('name', default='main', nargs='?',
+                        help='module name')
+    if sys.version_info < (3, 7):
+        subs = parser.add_subparsers(title='modules available',
+                                     dest='module')
+    else:
+        subs = parser.add_subparsers(title='modules available',
+                                     dest='module', required=False)
+    group_options = collections.defaultdict(set)
+
+    for module, module_cls in configurables.items():
+        _parser_formatter = argparse.ArgumentDefaultsHelpFormatter
+        sub = subs.add_parser(module, help=module_cls.help,
+                              formatter_class=_parser_formatter)
+        group = sub.add_argument_group('config')
+
+        with ParserBuilder(group, argument_style) as builder:
+            for name, opt in module_cls.__funcspec__.kw:
+                builder.add_opt(name, opt)
+
+        for action in group._group_actions:
+            group_options[module].add(action.dest)
+
+        def save(args):
+            with Workspace(args.workspace) as ws:
+                m = args.module
+                cfg = [(name, value)
+                       for (name, value) in args._get_kwargs()
+                       if name in group_options[m]]
+                cfg = Configuration(cfg)
+                msg = '[%s] configured "%s" as "%s"' % \
+                    (ws, args.name, m)
+                if cfg._config:
+                    msg += ' with: ' + str(cfg)
+                print(msg, file=sys.stderr)
+                ws.register(args.name, configurables[m],
+                            **cfg._dict())
+
+        sub.set_defaults(func=save)
+
+
+def _config_default_func(args):
+    ws = args.workspace
+    ws = Workspace(ws)
+    cfg = ws.config_path
+    if cfg.exists():
+        cfg = cfg.open().read().strip()
+        return cfg
+    else:
+        raise NotConfiguredError('no configuration in this workspace')
 
 
 @command(help='fork workspace, possibly with modifications')
@@ -147,53 +363,3 @@ def summarize(
     if output == 'html':
         return df.to_html(escape=False)
     return df
-
-
-def main(args=None):
-    pass
-
-
-class ParserBuilder:
-    """Utility to generate CLI arguments in different styles."""
-
-    def __init__(self, parser, style='java'):
-        self._parser = parser
-        self._style = style
-        self._names = []
-        self._spec = []
-
-    def add_opt(self, name, spec):
-        """Add option with specification.
-
-        Args:
-            name (str) : option name
-            spec (argspec): argument specification"""
-
-        if spec.default() is True:
-            # change name for better bool support
-            spec._kwargs['dest'] = name  # pylint: disable=protected-access
-            name = 'no_' + name
-        self._names.append(name)
-        self._spec.append(spec)
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        prefix = '-' if self._style == 'java' else '--'
-        seen = set(self._names)
-        for name, spec in zip(self._names, self._spec):
-            if name.startswith('_'):
-                continue
-            args, kwargs = spec.spec()
-            if not args:
-                args = [prefix + name]
-                short = ''.join(seg[0] for seg in name.split('_'))
-                if short not in seen:
-                    args.append('-' + short)
-                    seen.add(short)
-            else:
-                kwargs['dest'] = name
-            if 'help' not in kwargs:
-                kwargs['help'] = 'parameter ' + name
-            self._parser.add_argument(*args, **kwargs)

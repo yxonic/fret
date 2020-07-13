@@ -1,5 +1,3 @@
-import abc
-import argparse
 import functools
 import inspect as ins
 
@@ -32,19 +30,6 @@ class Module:
     def help(cls):  # pylint: disable=no-self-argument
         return 'module ' + cls.__name__  # pylint: disable=no-member
 
-    @classmethod
-    def _add_arguments(cls, parser: argparse.ArgumentParser):
-        for base_cls in reversed(cls.__mro__):
-            if hasattr(base_cls, 'add_arguments'):
-                base_cls.add_arguments(parser)
-        for submodule in cls.submodules:
-            parser.add_argument('-' + submodule, default=submodule,
-                                help='submodule ' + submodule)
-
-    @classmethod
-    def add_arguments(cls, parser: argparse.ArgumentParser):
-        """Add arguments to an argparse subparser."""
-
     def __init__(self, **kwargs):
         """
         Args:
@@ -57,30 +42,8 @@ class Module:
         return self.__class__.__name__ + '(' + str(self.config) + ')'
 
 
-class Command(abc.ABC):
-    """Command interface."""
-    __slots__ = []
-
-    @classproperty
-    def help(cls):  # pylint: disable=no-self-argument
-        # pylint: disable=no-member
-        return 'command ' + cls.__name__.lower()
-
-    def _run(self, args):
-        # pylint: disable=protected-access
-        ws = args.workspace
-        del args.command, args.func, args.workspace
-        args = {name: value for (name, value) in args._get_kwargs()}
-        args = Configuration(args)
-        return self.run(ws, args)
-
-    @abc.abstractmethod
-    def run(self, ws, args):
-        raise NotImplementedError
-
-
 class argspec:
-    """In control of the behavior of commands. Represents arguments for
+    """In control of the behavior of commands. Replicates arguments for
     :meth:`argparse.ArgumentParser.add_argument`."""
 
     __slots__ = ['_args', '_kwargs', '_params']
@@ -223,7 +186,7 @@ def configurable(wraps=None, submodules=None, build_subs=True, states=None):
         setattr(cls, 'state_dict', state_dict)
         setattr(cls, 'load_state_dict', load_state_dict)
         setattr(cls, '_build_subs', build_subs)
-
+        setattr(cls, '__funcspec__', spec)
         configurables[cls.__name__] = cls
         return cls
 
@@ -258,6 +221,8 @@ def command(wraps=None, help=None):
             new_f.config = Configuration(cfg)
             return f(*args, **kwargs)
 
+        setattr(new_f, '__funcspec__', spec)
+        setattr(new_f, '__static__', static)
         if help is not None:
             setattr(new_f, '__help__', help)
 
