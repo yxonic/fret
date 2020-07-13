@@ -1,441 +1,18 @@
+import abc
 import argparse
-import copy
+import functools
 import inspect as ins
-import json
-import logging
-import pathlib
 
-import toml
+from .util import _dict as dict, classproperty, Configuration
 
-from .exceptions import NotConfiguredError, NoWorkspaceError
-from .util import classproperty, Configuration, stateful, overload, \
-    Iterator, start_time, pickle
-# noinspection PyShadowingBuiltins
-from .util import _dict as dict  # pylint: disable=redefined-builtin
-
-
-class Workspace:
-    """Workspace utilities. One can save/load configurations, build models
-    with specific configuration, save snapshots, open results, etc., using
-    workspace objects."""
-
-    def __init__(self, app, path, config=None, config_dict=None):
-        self._app = app
-        self._path = pathlib.Path(path)
-        self._modules = dict()
-
-        conf = None
-        if self.config_path.exists():
-            conf = toml.load(self.config_path.open())
-        if config_dict is not None:
-            if conf is None:
-                conf = config_dict
-            else:
-                conf.update(config_dict)
-
-        self._config_dict = None
-        if conf is not None:
-            self._config_dict = copy.deepcopy(conf)
-            for name, cfg in conf.items():
-                cls_name = cfg['__module']
-                del cfg['__module']
-                self._modules[name] = (cls_name, cfg)
-
-        if config:
-            self._modules.update(config)
-
-    def config_dict(self):
-        return {name: dict({'__module': cls_name}, **cfg)
-                for name, (cls_name, cfg) in self._modules.items()}
-
-    @property
-    def path(self):
-        """Workspace root path."""
-        if not self._path.exists():
-            self._path.mkdir(parents=True)
-        return self._path
-
-    @property
-    def config_path(self):
-        """Workspace configuration path."""
-        cp = self.path.joinpath('config.toml')
-        return cp
-
-    def log(self, *filename):
-        """Get log file path within current workspace.
-
-        Args:
-            filename (str or list): relative path to file; if ommited, returns
-                                    root path of logs.
-        """
-        path = self.path.joinpath('log', *filename)
-        _mkdir(path, not filename or filename[-1].endswith('/'))
-        return path
-
-    def result(self, *filename):
-        """Get result file path within current workspace.
-
-        Args:
-            filename (str or list): relative path to file; if ommited, returns
-                                    root path of results.
-        """
-        path = self.path.joinpath('result', *filename)
-        _mkdir(path, not filename or filename[-1].endswith('/'))
-        return path
-
-    def snapshot(self, *filename):
-        """Get snapshot file path within current workspace.
-
-        Args:
-            filename (str or list): relative path to file; if ommited, returns
-                                    root path of snapshots.
-        """
-        path = self.path.joinpath('snapshot', *filename)
-        _mkdir(path, not filename or filename[-1].endswith('/'))
-        return path
-
-    @overload((..., str, ...), ...,
-              (..., ...), lambda self, m: (self, 'main', m))
-    def register(self, name, module, **kwargs):
-        """Register and save module configuration."""
-        if not ins.isclass(module):
-            cfg = module.config._dict()  # pylint: disable=protected-access
-            cfg.update(kwargs)
-            self._modules[name] = (module.__class__.__name__, cfg)
-        else:
-            self._modules[name] = (module.__name__, kwargs)
-
-    def write(self):
-        """Save module configuration of this workspace to file."""
-        toml.dump(self.config_dict(), self.config_path.open('w'))
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.write()
-
-    def _try_get_module(self, name='main'):
-        if name in self._modules:
-            return self._modules[name]
-        else:
-            raise NotConfiguredError('module %s not configured' % name)
-
-    def build(self, name='main', **kwargs):
-        """Build module according to the configurations in current
-        workspace."""
-        cls_name, cfg = self._try_get_module(name)
-        cfg = cfg.copy()
-        cfg.update(kwargs)
-
-        try:
-            cls = self._app.load_module(cls_name)
-        except KeyError:
-            raise KeyError('definition of module %s not found' % cls_name)
-
-        for sub in cls.submodules:
-            if sub not in cfg or isinstance(cfg[sub], str):
-                if cls._build_subs:  # pylint: disable=protected-access
-                    cfg[sub] = self.build(cfg.get(sub) or sub)
-                else:
-                    cfg[sub] = Builder(self, cfg.get(sub) or sub)
-
-        # noinspection PyCallingNonCallable
-        obj = cls(**cfg)
-        obj.ws = self
-        obj.build_name = name
-        if kwargs:
-            obj.spec = Configuration(kwargs)
-        return obj
-
-    def save(self, obj, tag):
-        """Save module as a snapshot.
-
-        Args:
-            tag (str or pathlib.Path) : snapshot tag or path."""
-        # pylint: disable=protected-access
-        env = self.config_dict()
-        args = obj.spec._dict() if hasattr(obj, 'spec') else dict()
-        state = obj.state_dict()
-        if isinstance(tag, str) and not tag.endswith('.pt'):
-            f = self.snapshot(obj.build_name + '.' + tag + '.pt')
-        else:
-            f = pathlib.Path(tag)
-        pickle.dump({'env': env, 'args': args, 'state': state}, str(f))
-
-    @overload((..., str, ...), ...,
-              (..., ...), lambda self, t: (self, 'main', t))
-    def load(self, name, tag):
-        """Load module from a snapshot.
-
-        Args:
-            tag (str or pathlib.Path) : snapshot tag or path."""
-        if isinstance(tag, str) and not tag.endswith('.pt'):
-            f = self.snapshot(name + '.' + tag + '.pt')
-        else:
-            f = pathlib.Path(tag)
-        state = pickle.load(str(f))
-        last_ws = Workspace(self._app, self._path, config_dict=state['env'])
-        obj = last_ws.build(name, **state['args'])
-        obj.load_state_dict(state['state'])
-        return obj
-
-    def logger(self, name: str):
-        """Get a logger that logs to a file under workspace.
-
-        Notice that same logger instance is returned for same names.
-
-        Args:
-            name(str): logger name
-        """
-        logger = logging.getLogger(name)
-        if logger.handlers:
-            # previously configured, remain unchanged
-            return logger
-        file_formatter = logging.Formatter('%(levelname)s [%(name)s] '
-                                           '%(asctime)s %(message)s',
-                                           datefmt='%Y-%m-%d %H:%M:%S')
-        file_handler = logging.FileHandler(
-            str(self.log(name + '.log')))
-        file_handler.setFormatter(file_formatter)
-        logger.addHandler(file_handler)
-        return logger
-
-    def record(self, value, metrics, descending=None, **kwargs):
-        is_des = descending is True or \
-            (descending is None and metrics.endswith('-'))
-        metrics = metrics.rstrip('+-') + ('-' if is_des else '+')
-
-        data = {}
-        for name, cfg in self.config_dict().items():
-            for k, v in cfg.items():
-                data[name + '.' + k] = v
-
-        data.update({'metrics': metrics, 'value': value})
-        data.update(kwargs)
-
-        with self.result(start_time + '.json-lines').open('a') as of:
-            print(json.dumps(data), file=of)
-
-    def run(self, tag, resume=True):
-        """Initiate a context manager that provides a persistent running
-        environment. Mainly used to suspend and resume a time consuming
-        process."""
-        return Run(self, tag, resume)
-
-    def __str__(self):
-        return str(self.path)
-
-    def __repr__(self):
-        return 'Workspace(path=' + str(self.path) + ')'
-
-
-class Run:
-    """Class designed for running state persistency."""
-
-    __slots__ = ['_ws', '_id', '_states', '_index', '_seen']
-
-    def __init__(self, ws, tag, resume):
-        self._ws = ws
-        self._id = None
-        self._states = dict()
-        self._index = 0
-        self._seen = set()  # only load once from file
-        if resume:
-            # TODO: accurate name search
-            ids = [fn.name for fn in ws.snapshot().iterdir()
-                   if fn.is_dir() and fn.name.startswith(tag + '-')]
-            if ids:
-                self._id = max(ids)  # most recent
-        if self._id is None:
-            self._id = tag + '-' + start_time
-        if not resume:
-            while ws.snapshot(self._id).exists():
-                self._id = self._id + '_'
-
-    def __enter__(self):
-        # load state if possible
-        state_file = self._ws.snapshot(self._id, '.states.pt')
-        if state_file.exists():
-            self._states = pickle.load(str(state_file))
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        state_file = self._ws.snapshot(self._id, '.states.pt')
-        for k in self._states:
-            if hasattr(self._states[k], 'state_dict'):
-                self._states[k] = self._states[k].state_dict()
-        pickle.dump(self._states, str(state_file))
-
-    @property
-    def id(self):
-        return self._id
-
-    @overload((..., str, ...), ...,
-              (..., ...), lambda self, m: (self, None, m))
-    def value(self, name, value):
-        if name is None:
-            name = str(self._index)
-            self._index += 1
-        if name in self._states and name not in self._seen:
-            self._seen.add(name)
-            return self._states[name]
-        else:
-            self._states[name] = value
-            return value
-
-    @overload((..., str, ...), ...,
-              (..., None, ...), ...,
-              (..., ...), lambda self, m: (self, None, m))
-    def register(self, name, obj):
-        if name is None:
-            name = str(self._index)
-            self._index += 1
-        if name in self._states and name not in self._seen:
-            obj.load_state_dict(self._states[name])
-
-        self._seen.add(name)
-        self._states[name] = obj
-        return obj
-
-    @overload((..., str, ...), ...,
-              (..., ...), lambda self, m: (self, None, m),
-              ..., ...)
-    def iter(self, name, data, *label, **kwargs):
-        return self.register(name, Iterator(data, *label, **kwargs))
-
-    @overload((..., str), ...,
-              (...,), lambda self: (self, None))
-    def acc(self, name):
-        return self.register(name, Accumulator())
-
-    @overload((..., str, int), ...,
-              (..., str, int, int), ...,
-              (..., str, int, int, int), ...,
-              (..., int), lambda self, *args: (self, None) + args,
-              (..., int, int), lambda self, *args: (self, None) + args,
-              (..., int, int, int), lambda self, *args: (self, None) + args)
-    def range(self, name, *args):
-        """Works like normal range but with position recorded. Next time start
-        from next loop, as current loop is finished."""
-        return self.register(name, Range(*args))
-
-    @overload((..., str, int), ...,
-              (..., str, int, int), ...,
-              (..., str, int, int, int), ...,
-              (..., int), lambda self, *args: (self, None) + args,
-              (..., int, int), lambda self, *args: (self, None) + args,
-              (..., int, int, int), lambda self, *args: (self, None) + args)
-    def brange(self, name, *args):
-        """Breakable range. Works like normal range but with position recorded.
-        Next time start from current position, as this loop isn't finished."""
-        return self.register(name, Range(*args, breakable=True))
-
-    def log(self, *filename):
-        path = self._ws.path.joinpath('log', self._id, *filename)
-        _mkdir(path, not filename or filename[-1].endswith('/'))
-        return path
-
-    def result(self, *filename):
-        path = self._ws.path.joinpath('result', self._id, *filename)
-        _mkdir(path, not filename or filename[-1].endswith('/'))
-        return path
-
-    def snapshot(self, *filename):
-        path = self._ws.path.joinpath('snapshot', self._id, *filename)
-        _mkdir(path, not filename or filename[-1].endswith('/'))
-        return path
-
-
-@stateful
-class Accumulator:
-    """A stateful accumulator."""
-    __slots__ = ['_sum', '_cnt']
-
-    def __init__(self):
-        self._sum = 0
-        self._cnt = 0
-
-    def __iadd__(self, other):
-        self._sum += other
-        self._cnt += 1
-        return self
-
-    def __int__(self):
-        return int(self._sum)
-
-    def __float__(self):
-        return float(self._sum)
-
-    def clear(self):
-        self._sum = 0
-        self._cnt = 0
-
-    def sum(self):
-        return self._sum
-
-    def mean(self):
-        return self._sum / self._cnt if self._cnt > 0 else self._sum
-
-
-@stateful('start', '_breakable')
-class Range:
-    """A stateful range object that mimics built-in ``range``."""
-    __slots__ = ['start', 'step', 'stop', '_start', '_breakable']
-
-    def __init__(self, *args, breakable=False):
-        r = range(*args)
-        self.start = r.start
-        self.step = r.step
-        self.stop = r.stop
-        self._start = r.start
-        self._breakable = breakable
-
-    def __iter__(self):
-        for i in range(self.start, self.stop, self.step):
-            self.start = i + (0 if self._breakable else self.step)
-            yield i
-
-    def clear(self):
-        self.start = self._start
-
-
-class Builder:
-    """Class for building a specific module, with preset ws configuration."""
-    def __init__(self, ws, name):
-        self.ws = ws
-        self._name = name
-
-    def __eq__(self, other):
-        # pylint: disable=protected-access
-        return self.ws._modules[self._name] == other.ws._modules[other._name]
-
-    def __call__(self, **kwargs):
-        return self.ws.build(self._name, **kwargs)
-
-    def __str__(self):
-        # pylint: disable=protected-access
-        cls_name, cfg = self.ws._modules[self._name]
-        return cls_name + '(' + str(Configuration(cfg)) + ')'
-
-    def __repr__(self):
-        return str(self)
-
-    def __getattr__(self, item):
-        # pylint: disable=protected-access
-        cls_name, _ = self.ws._try_get_module(self._name)
-        try:
-            # pylint: disable=protected-access
-            cls = self.ws._app.load_module(cls_name)
-        except KeyError:
-            raise KeyError('definition of module %s not found' % cls_name)
-        return getattr(cls, item)
+configurables = dict()
+commands = dict()
 
 
 class Module:
     """Interface for configurable modules.
 
-    Each module class should have an ``configure`` class method to define
+    Each module class should have an ``add_arguments`` class method to define
     model arguments along with their types, default values, etc.
     """
 
@@ -479,17 +56,227 @@ class Module:
     def __str__(self):
         return self.__class__.__name__ + '(' + str(self.config) + ')'
 
-    def __repr__(self):
-        return str(self)
+
+class Command(abc.ABC):
+    """Command interface."""
+    __slots__ = []
+
+    @classproperty
+    def help(cls):  # pylint: disable=no-self-argument
+        # pylint: disable=no-member
+        return 'command ' + cls.__name__.lower()
+
+    def _run(self, args):
+        # pylint: disable=protected-access
+        ws = args.workspace
+        del args.command, args.func, args.workspace
+        args = {name: value for (name, value) in args._get_kwargs()}
+        args = Configuration(args)
+        return self.run(ws, args)
+
+    @abc.abstractmethod
+    def run(self, ws, args):
+        raise NotImplementedError
 
 
-def _mkdir(p, is_dir=False):
-    if is_dir:
-        if not p.exists():
-            p.mkdir(parents=True)
+class argspec:
+    """In control of the behavior of commands. Represents arguments for
+    :meth:`argparse.ArgumentParser.add_argument`."""
+
+    __slots__ = ['_args', '_kwargs', '_params']
+
+    def __init__(self, *args, **kwargs):
+        self._args = args
+        self._kwargs = kwargs
+        self._params = None
+
+    def default(self):
+        return self._kwargs.get('default')
+
+    def spec(self):
+        return self._args, self._kwargs
+
+    @classmethod
+    def from_param(cls, param):
+        kwargs = dict()
+
+        if isinstance(param, tuple):
+            assert len(param) == 2 or len(param) == 3, \
+                'should be default, help[, choices]'
+            kwargs['default'] = param[0]
+            kwargs['help'] = param[1]
+            if len(param) == 3:
+                kwargs['choices'] = param[2]
+        else:
+            kwargs['default'] = param
+
+        if isinstance(kwargs['default'], list):
+            if kwargs['default']:
+                kwargs['nargs'] = '+'
+                kwargs['type'] = type(kwargs['default'][0])
+            else:
+                kwargs['nargs'] = '*'
+        elif isinstance(kwargs['default'], bool):
+            if kwargs['default']:
+                kwargs['action'] = 'store_false'
+            else:
+                kwargs['action'] = 'store_true'
+        elif kwargs['default'] is not None:
+            kwargs['type'] = type(kwargs['default'])
+
+        obj = cls(**kwargs)
+        obj._params = param  # pylint: disable=protected-access
+        return obj
+
+
+class funcspec:
+    """Utility to generate argument specification from function signature."""
+
+    __slots__ = ['pos', 'kw', 'kw_only']
+
+    def __init__(self, f):
+        spec = ins.getfullargspec(f)
+        if spec.defaults:
+            self.kw_only = False
+            n_config = len(spec.defaults)
+            self.pos = spec.args[:-n_config]
+            opts = [v if isinstance(v, argspec) else argspec.from_param(v)
+                    for v in spec.defaults]
+            self.kw = [] if n_config == 0 else \
+                list(zip(spec.args[-n_config:], opts))
+        else:
+            self.kw_only = True
+            self.pos = spec.args
+            if spec.kwonlydefaults:
+                self.kw = list(spec.kwonlydefaults.items())
+            else:
+                self.kw = []
+
+    def get_call_args(self, *args, **kwargs):
+        defaults = dict((k, v.default()) for k, v in self.kw)
+        if not self.kw_only:
+            if len(args) > len(self.pos):
+                n_other = len(args) - len(self.pos)
+                defaults.update(dict([(self.kw[i][0], args[i - n_other])
+                                      for i in range(n_other)]))
+                args = args[:-n_other]
+        defaults.update(dict([(k, v.default()) for k, v in self.kw]))
+        defaults.update(kwargs)
+        cfg = list(zip(self.pos, args)) + list(defaults.items())
+        return args, defaults, cfg
+
+
+def configurable(wraps=None, submodules=None, build_subs=True, states=None):
+    """Class decorator that registers configurable module under current app.
+
+    Args:
+        wraps (class or None) : object to be decorated; could be given later
+        submodules (list) : submodules of this module
+        build_subs (bool) : whether submodules are built before building this
+                            module (default: ``True``)
+        states (list) : members that would appear in state_dict
+    """
+    def wrapper(cls):
+        if not ins.isclass(cls):
+            raise TypeError('only class can be configurable')
+        orig_init = cls.__init__
+        spec = funcspec(orig_init)
+
+        if submodules is not None:
+            if isinstance(submodules, str):
+                setattr(cls, 'submodules', submodules.split(','))
+            else:
+                setattr(cls, 'submodules', submodules)
+
+        orig_state_dict = getattr(cls, 'state_dict', lambda _: dict())
+        orig_load_state_dict = getattr(cls, 'load_state_dict',
+                                       lambda *_: None)
+
+        def state_dict(sf, *args, **kwargs):
+            if states:
+                d = {s: getattr(sf, s) for s in states}
+            else:
+                d = dict()
+            d.update(orig_state_dict(sf, *args, **kwargs))
+            return d
+
+        def load_state_dict(sf, state, *args, **kwargs):
+            if states:
+                for s in states:
+                    setattr(sf, s, state[s])
+                    del state[s]
+            orig_load_state_dict(sf, state, *args, **kwargs)
+
+        def new_init(sf, *args, **kwargs):
+            # get config from signature
+            args, kwargs, cfg = spec.get_call_args(sf, *args, **kwargs)
+            if not hasattr(sf, 'config'):
+                d = dict(cfg[1:])  # remove self
+                Module.__init__(sf, **d)
+            orig_init(*args, **kwargs)
+
+        # inherit Module methods
+        for k, v in Module.__dict__.items():
+            if k != '__dict__' and k not in cls.__dict__:
+                setattr(cls, k, v)
+        setattr(cls, '__init__', new_init)
+        setattr(cls, 'state_dict', state_dict)
+        setattr(cls, 'load_state_dict', load_state_dict)
+        setattr(cls, '_build_subs', build_subs)
+
+        configurables[cls.__name__] = cls
+        return cls
+
+    if wraps is None:
+        return wrapper
     else:
-        if not p.parent.exists():
-            p.parent.mkdir(parents=True)
+        return wrapper(wraps)
 
 
-__all__ = ['Workspace', 'Run', 'Accumulator', 'Range', 'Module', 'Builder']
+def command(wraps=None, help=None):
+    """Function decorator that would turn a function into a fret command."""
+    def wrapper(f):
+        if not ins.isfunction(f):
+            raise TypeError('only function can form command')
+        name = f.__name__
+        spec = funcspec(f)
+        if spec.pos and spec.pos[0] == 'ws':
+            static = False
+        else:
+            static = True
+
+        @functools.wraps(f)
+        def new_f(*args, **kwargs):
+            args, kwargs, cfg = spec.get_call_args(*args, **kwargs)
+            if hasattr(new_f, 'global_config'):
+                d = new_f.global_config.copy()
+                d.update(dict(cfg[int(not static):]))
+                cfg = d
+            else:
+                d = dict(cfg[int(not static):])
+            cfg = cfg[int(not static):]
+            new_f.config = Configuration(cfg)
+            return f(*args, **kwargs)
+
+        if help is not None:
+            setattr(new_f, '__help__', help)
+
+        commands[name] = new_f
+        return new_f
+
+    if wraps is None:
+        return wrapper
+    else:
+        return wrapper(wraps)
+
+
+class NotConfiguredError(Exception):
+    pass
+
+
+class NoWorkspaceError(Exception):
+    pass
+
+
+class NoAppError(Exception):
+    pass
