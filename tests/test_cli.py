@@ -141,7 +141,7 @@ def test_main(tmpdir: py.path.local, caplog):
 
     appdir.join('fret.toml').open('w').close()
 
-    os.chdir(appdir.join('ws/model2'))
+    os.chdir(str(appdir.join('ws/model2')))
     importlib.reload(fret)
     importlib.reload(fret.app)
 
@@ -156,7 +156,7 @@ def test_main(tmpdir: py.path.local, caplog):
     with appdir.join('app.py').open('w') as f:
         f.write(code1)
 
-    os.chdir(appdir)
+    os.chdir(str(appdir))
     del sys.modules['main']
     del fret.app._module
     importlib.reload(fret)
