@@ -181,7 +181,7 @@ class Workspace:
         Args:
             name(str): logger name
         """
-        logger = logging.getLogger(name)
+        logger = logging.getLogger('fret.' + name)
         if logger.handlers:
             # previously configured, remain unchanged
             return logger
