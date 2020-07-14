@@ -11,7 +11,7 @@ from .util import _dict, Configuration
 # load configuration
 _p = pathlib.Path().absolute()
 if _p.joinpath('fret.toml').exists():
-    _path = str(_p)
+    _path = _p
 else:
     while _p != _p.parent:
         if _p.joinpath('fret.toml').exists():
@@ -51,7 +51,13 @@ else:
     else:
         sys.path.remove(root)
         raise NoAppError('cannot find app to import')
+
+if 'import_modules' in config:
+    for m in config.import_modules:
+        importlib.import_module(m)
+
 sys.path.remove(root)
+
 
 # expose commands
 for _name, _cmd in commands.items():
