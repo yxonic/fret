@@ -1,7 +1,7 @@
 # fret
 
-[![Travis (.org)](https://img.shields.io/travis/yxonic/fret.svg)](https://travis-ci.org/yxonic/fret)
-[![Codecov](https://img.shields.io/codecov/c/gh/yxonic/fret?token=3738c9f816aa4a31be83fd12402149f9)](https://codecov.io/gh/yxonic/fret)
+[![Travis (.org)](https://img.shields.io/travis/yxonic/fret/v0.3)](https://travis-ci.org/yxonic/fret)
+[![Codecov](https://img.shields.io/coveralls/github/yxonic/fret/v0.3)](https://codecov.io/gh/yxonic/fret)
 [![Documentation Status](https://readthedocs.org/projects/fret/badge/?version=latest)](https://fret.readthedocs.io/en/latest/?badge=latest)
 [![PyPI](https://img.shields.io/pypi/v/fret.svg)](https://pypi.python.org/pypi/fret)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/fret.svg)](https://pypi.python.org/pypi/fret)
@@ -193,7 +193,7 @@ foo='bar'
 - [ ] Stablize programming API (around workspace).
 - [ ] Workspace runtime.
 - [ ] Better result recording and querying using db.
-- [ ] No confusing overloads. Be explicit.
-- [ ] `App` is specialized for command line use.
-- [ ] CLI launch optimization.
+- [x] No confusing overloads. Be explicit.
+- [x] `cli` module specialized for command line use.
+- [x] CLI launch optimization.
 - [ ] Windows support.
