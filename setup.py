@@ -9,7 +9,7 @@ with open('README.md') as f:
     long_description = f.read()
 
 test_deps = [
-    'pytest>=4',
+    'pytest>=4.6.0',
     'pytest-cov>=2.6.0',
     'pytest-flake8>=1',
 ]
