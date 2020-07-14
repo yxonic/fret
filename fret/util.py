@@ -35,11 +35,12 @@ class pickle:
 
     @staticmethod
     def load(f):
-        return pickle.loader(f)
+        return pickle.loader(open(f, 'rb'))
 
     @staticmethod
     def dump(obj, f):
-        pickle.saver(obj, f)
+        with open(f, 'wb') as of:
+            pickle.saver(obj, of)
 
 
 class Configuration:

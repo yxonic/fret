@@ -1,5 +1,6 @@
 import copy
 import inspect as ins
+import json
 import logging
 import pathlib
 
@@ -155,15 +156,17 @@ class Workspace:
             f = pathlib.Path(tag)
         pickle.dump({'env': env, 'args': args, 'state': state}, str(f))
 
-    def load(self, name, tag):
+    def load(self, name='main', tag=None, path=None):
         """Load module from a snapshot.
 
         Args:
             tag (str or pathlib.Path) : snapshot tag or path."""
-        if isinstance(tag, str) and not tag.endswith('.pt'):
-            f = self.snapshot(name + '.' + tag + '.pt')
+        if tag is None and path is None:
+            f = self.snapshot(name + '.pt')
+        elif path:
+            f = pathlib.Path(path)
         else:
-            f = pathlib.Path(tag)
+            f = self.snapshot(name + '.' + tag + '.pt')
         state = pickle.load(str(f))
         last_ws = Workspace(self._path, config_dict=state['env'])
         obj = last_ws.build(name, **state['args'])
@@ -196,6 +199,22 @@ class Workspace:
         environment. Mainly used to suspend and resume a time consuming
         process."""
         return Run(self, tag, resume)
+
+    def record(self, value, metrics, descending=None, **kwargs):
+        is_des = descending is True or \
+            (descending is None and metrics.endswith('-'))
+        metrics = metrics.rstrip('+-') + ('-' if is_des else '+')
+
+        data = {}
+        for name, cfg in self.config_dict().items():
+            for k, v in cfg.items():
+                data[name + '.' + k] = v
+
+        data.update({'metrics': metrics, 'value': value})
+        data.update(kwargs)
+
+        with self.result(start_time + '.json-lines').open('a') as of:
+            print(json.dumps(data), file=of)
 
     def __str__(self):
         return str(self.path)
@@ -245,7 +264,7 @@ class Run:
     def id(self):
         return self._id
 
-    def value(self, name, value):
+    def value(self, value, name=None):
         if name is None:
             name = str(self._index)
             self._index += 1
@@ -256,7 +275,7 @@ class Run:
             self._states[name] = value
             return value
 
-    def register(self, name, obj):
+    def register(self, obj, name=None):
         if name is None:
             name = str(self._index)
             self._index += 1
@@ -267,21 +286,21 @@ class Run:
         self._states[name] = obj
         return obj
 
-    def iter(self, name, data, *label, **kwargs):
-        return self.register(name, Iterator(data, *label, **kwargs))
+    def iter(self, data, *label, name=None, **kwargs):
+        return self.register(Iterator(data, *label, **kwargs), name)
 
-    def acc(self, name):
-        return self.register(name, Accumulator())
+    def acc(self, name=None):
+        return self.register(Accumulator(), name)
 
-    def range(self, name, *args):
+    def range(self, *args, name=None):
         """Works like normal range but with position recorded. Next time start
         from next loop, as current loop is finished."""
-        return self.register(name, Range(*args))
+        return self.register(Range(*args), name)
 
-    def brange(self, name, *args):
+    def brange(self, *args, name=None):
         """Breakable range. Works like normal range but with position recorded.
         Next time start from current position, as this loop isn't finished."""
-        return self.register(name, Range(*args, breakable=True))
+        return self.register(Range(*args, breakable=True), name)
 
     def log(self, *filename):
         path = self._ws.path.joinpath('log', self._id, *filename)
@@ -378,7 +397,7 @@ class Builder:
         cls_name, _ = self.ws._try_get_module(self._name)
         try:
             # pylint: disable=protected-access
-            cls = self.ws._app.load_module(cls_name)
+            cls = configurables[cls_name]
         except KeyError:
             raise KeyError('definition of module %s not found' % cls_name)
         return getattr(cls, item)

@@ -3,6 +3,7 @@ import collections
 import logging
 import shutil
 import sys
+import os
 
 from .common import command, argspec, commands, configurables, \
     NoAppError, NotConfiguredError
@@ -34,8 +35,7 @@ def main(args=None):
 
     main_parser.add_argument('-q', action='store_true', help='quiet')
     main_parser.add_argument('-v', action='store_true', help='verbose')
-    main_parser.add_argument('-w', '--workspace', help='workspace dir',
-                             default='ws/_default')
+    main_parser.add_argument('-w', '--workspace', help='workspace dir')
 
     subparsers = main_parser.add_subparsers(title='supported commands',
                                             dest='command')
@@ -80,6 +80,13 @@ def main(args=None):
 
     logger = logging.getLogger('fret.' + args.command)
     try:
+        if args.workspace is None:
+            cwd = os.getcwd()
+            if app is not None and not os.path.samefile(cwd, app.root):
+                args.workspace = cwd
+                os.chdir(app.root)
+            else:
+                args.workspace = 'ws/_default'
         return args.func(args)
     except KeyboardInterrupt:
         # print traceback info to screen only
