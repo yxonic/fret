@@ -194,10 +194,10 @@ def colored(fmt, fg=None, bg=None, style=None):
         return fmt
 
 
-def _pairwise(l):
+def _pairwise(ls):
     i = 0
-    while i < len(l):
-        yield l[i], l[i + 1]
+    while i < len(ls):
+        yield ls[i], ls[i + 1]
         i += 2
 
 
