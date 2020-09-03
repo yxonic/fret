@@ -3,11 +3,26 @@ import inspect as ins
 import json
 import logging
 import pathlib
+import pickle
+from datetime import datetime
 
 import toml
 
 from .common import configurables, NotConfiguredError
-from .util import Configuration, stateful, Iterator, start_time, pickle
+from .util import Configuration, stateful, Iterator
+
+
+class Runtime:
+    def __init__(self):
+        self.start_time = datetime.now()
+        self.date_str = self.start_time.strftime('%Y%m%d%H%M%S')
+
+    def save(self, obj, fn):
+        with open(fn, 'wb') as f:
+            pickle.dump(obj, f)
+
+    def load(self, fn):
+        return pickle.load(open(fn, 'rb'))
 
 
 class Workspace:
