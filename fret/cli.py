@@ -37,6 +37,27 @@ def main(args=None):
     main_parser.add_argument('-v', action='store_true', help='verbose')
     main_parser.add_argument('-w', '--workspace', help='workspace dir')
 
+    args, remaining = main_parser.parse_known_args() if args is None \
+        else main_parser.parse_known_args(args)
+
+    # configure logging level
+    if args.q:
+        logger.setLevel(logging.WARNING)
+    elif args.v:
+        logger.setLevel(logging.DEBUG)
+    else:
+        logger.setLevel(logging.INFO)
+
+    if args.workspace is None:
+        cwd = os.getcwd()
+        if app is not None and not os.path.samefile(cwd, app.root):
+            ws = cwd
+            os.chdir(app.root)
+        else:
+            ws = 'ws/_default'
+    else:
+        ws = args.workspace
+
     subparsers = main_parser.add_subparsers(title='supported commands',
                                             dest='command')
     subparsers.required = True
@@ -63,30 +84,11 @@ def main(args=None):
     else:
         config_sub = None
 
-    args = main_parser.parse_args() if args is None \
-        else main_parser.parse_args(args)
-
-    # configure logging level
-    if args.q:
-        logger.setLevel(logging.WARNING)
-    elif args.v:
-        logger.setLevel(logging.DEBUG)
-    else:
-        logger.setLevel(logging.INFO)
-
-    # remove logging related options
-    del args.q
-    del args.v
-
+    args = main_parser.parse_args(remaining)
     logger = logging.getLogger('fret.' + args.command)
+    args.workspace = ws
+
     try:
-        if args.workspace is None:
-            cwd = os.getcwd()
-            if app is not None and not os.path.samefile(cwd, app.root):
-                args.workspace = cwd
-                os.chdir(app.root)
-            else:
-                args.workspace = 'ws/_default'
         return args.func(args)
     except KeyboardInterrupt:
         # print traceback info to screen only
