@@ -51,18 +51,32 @@ def main(args=None):
     if args.workspace is None:
         cwd = os.getcwd()
         if app is not None and not os.path.samefile(cwd, app.root):
-            ws = cwd
+            ws_path = cwd
             os.chdir(app.root)
         else:
-            ws = 'ws/_default'
+            ws_path = 'ws/_default'
     else:
-        ws = args.workspace
+        ws_path = args.workspace
+
+    ws = Workspace(ws_path)
+    main = None
 
     subparsers = main_parser.add_subparsers(title='supported commands',
                                             dest='command')
     subparsers.required = True
 
     for cmd, f in commands.items():
+        if len(f.__funcspec__.pos) > 0 and f.__funcspec__.pos[0] == 'self':
+            cls_name = f.__wrapped__.__qualname__.split('.')[0]
+            if main is None:
+                try:
+                    main = ws.build()
+                except NotConfiguredError:
+                    main = ''
+            if cls_name != main.__class__.__name__:
+                # not applicable
+                continue
+
         sub = subparsers.add_parser(
             cmd, help=getattr(f, '__help__', 'command ' + cmd),
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -73,20 +87,26 @@ def main(args=None):
             for k, v in f.__funcspec__.kw:
                 builder.add_opt(k, v)
 
-        sub.set_defaults(func=_default_func(f))
+        if len(f.__funcspec__.pos) > 0 and f.__funcspec__.pos[0] == 'self':
+            sub.set_defaults(func=_default_func(f, main))
+        else:
+            sub.set_defaults(func=_default_func(f, ws))
 
     if app is not None:
         config_sub = subparsers.add_parser(
             'config', help='configure module for workspace',
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         _add_config_sub(config_sub, argument_style)
-        config_sub.set_defaults(func=_config_default_func)
+        config_sub.set_defaults(func=_config_default_func(ws))
     else:
         config_sub = None
 
     args = main_parser.parse_args(remaining)
+    del args.q
+    del args.v
+    args.workspace = ws_path
+
     logger = logging.getLogger('fret.' + args.command)
-    args.workspace = ws
 
     try:
         return args.func(args)
@@ -162,9 +182,8 @@ class ParserBuilder:
             self._parser.add_argument(*args, **kwargs)
 
 
-def _default_func(f):
+def _default_func(f, obj):
     def run(args):
-        ws = args.workspace
         del args.command, args.func, args.workspace
         args = {name: value for (name, value) in args._get_kwargs()}
         args = Configuration(args)
@@ -172,8 +191,7 @@ def _default_func(f):
         if f.__static__:
             return f(**args._dict())
         else:
-            ws = Workspace(ws)
-            return f(ws, **args._dict())
+            return f(obj, **args._dict())
     return run
 
 
@@ -219,15 +237,15 @@ def _add_config_sub(parser, argument_style):
         sub.set_defaults(func=save)
 
 
-def _config_default_func(args):
-    ws = args.workspace
-    ws = Workspace(ws)
-    cfg = ws.config_path
-    if cfg.exists():
-        cfg = cfg.open().read().strip()
-        return cfg
-    else:
-        raise NotConfiguredError('no configuration in this workspace')
+def _config_default_func(ws):
+    def f(args):
+        cfg = ws.config_path
+        if cfg.exists():
+            cfg = cfg.open().read().strip()
+            return cfg
+        else:
+            raise NotConfiguredError('no configuration in this workspace')
+    return f
 
 
 @command(help='fork workspace, possibly with modifications')

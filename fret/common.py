@@ -203,7 +203,7 @@ def command(wraps=None, help=None):
             raise TypeError('only function can form command')
         name = f.__name__
         spec = funcspec(f)
-        if spec.pos and spec.pos[0] == 'ws':
+        if spec.pos and (spec.pos[0] == 'ws' or spec.pos[0] == 'self'):
             static = False
         else:
             static = True
