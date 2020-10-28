@@ -31,7 +31,8 @@ def main(args=None):
 
     main_parser = _ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-        prog='fret')
+        prog='fret',
+        description='fret: Framework for Reproducible ExperimenTs')
 
     main_parser.add_argument('-q', action='store_true', help='quiet')
     main_parser.add_argument('-v', action='store_true', help='verbose')
@@ -79,7 +80,7 @@ def main(args=None):
     subparsers.required = True
 
     for cmd, f in commands.items():
-        if len(f.__funcspec__.pos) > 0 and f.__funcspec__.pos[0] == 'self':
+        if f.__functype__ == 'method':
             cls_name = f.__wrapped__.__qualname__.split('.')[0]
             if main is None:
                 try:
@@ -91,7 +92,7 @@ def main(args=None):
                 continue
 
         sub = subparsers.add_parser(
-            cmd, help=getattr(f, '__help__', 'command ' + cmd),
+            cmd, description=getattr(f, '__desc__', None),
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
         with ParserBuilder(sub, argument_style) as builder:
@@ -293,7 +294,11 @@ def fork(ws, path, mods=([], 'modifications (in format: NAME.ARG=VAL)')):
     ws_.write()
 
 
-@command(help='clean workspace')
+@command(
+    help='clean workspace',
+    description='Remove all snapshots in specific workspace by default. ' +
+                'If `--all` is specified, clean the entire workspace'
+)
 def clean(ws,
           config=(False, 'remove workspace configuration'),
           log=(False, 'clear workspace logs'),
@@ -303,7 +308,8 @@ def clean(ws,
               help='clear everything except for configuration'
           ),
           all=argspec('--all', action='store_true',
-                      help='clean the entire workspace')):
+                      help='clean the entire workspace'),
+          force=(False, 'do without confirmation')):
     """Command ``clean``.
 
     Remove all snapshots in specific workspace. If ``--all`` is specified,
@@ -311,8 +317,37 @@ def clean(ws,
     """
 
     if all:
+        if not force:
+            try:
+                c = input('[{}] clean the entire workspace? [y/N] '.format(ws))
+            except KeyboardInterrupt:
+                return 1
+            if c.lower() != 'y':
+                return 1
         shutil.rmtree(str(ws))
     else:
+        if not force:
+            if everything:
+                todo = ['snapshots', 'logs']
+                if config:
+                    todo.append('config')
+            else:
+                todo = []
+                if snapshot:
+                    todo.append('snapshots')
+                if log:
+                    todo.append('logs')
+                if config:
+                    todo.append('config')
+                if len(todo) == 0:
+                    todo.append('snapshots')
+            msg = '[{}] clean {}? [y/N] '.format(ws, ', '.join(todo))
+            try:
+                c = input(msg)
+            except KeyboardInterrupt:
+                return 1
+            if c.lower() != 'y':
+                return 1
         if (not config and not log) or snapshot or everything:
             # fret clean or fret clean -s ... or fret clean -a ...
             shutil.rmtree(str(ws.snapshot()))

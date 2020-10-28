@@ -196,15 +196,18 @@ def configurable(wraps=None, submodules=None, build_subs=True, states=None):
         return wrapper(wraps)
 
 
-def command(wraps=None, help=None):
+def command(wraps=None, help=None, description=None):
     """Function decorator that would turn a function into a fret command."""
     def wrapper(f):
         if not ins.isfunction(f):
             raise TypeError('only function can form command')
         name = f.__name__
         spec = funcspec(f)
+        ftype = 'function'
         if spec.pos and (spec.pos[0] == 'ws' or spec.pos[0] == 'self'):
             static = False
+            if spec.pos[0] == 'self':
+                ftype = 'method'
         else:
             static = True
 
@@ -223,8 +226,11 @@ def command(wraps=None, help=None):
 
         setattr(new_f, '__funcspec__', spec)
         setattr(new_f, '__static__', static)
+        setattr(new_f, '__functype__', ftype)
         if help is not None:
             setattr(new_f, '__help__', help)
+        if description is not None:
+            setattr(new_f, '__desc__', description)
 
         commands[name] = new_f
         return new_f
