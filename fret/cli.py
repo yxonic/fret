@@ -72,7 +72,10 @@ def main(args=None):
     else:
         ws_path = args.workspace
 
-    ws = Workspace(ws_path)
+    if os.path.exists(ws_path):
+        ws = Workspace(ws_path)
+    else:
+        ws = None
     main = None
 
     subparsers = main_parser.add_subparsers(title='supported commands',
@@ -81,6 +84,8 @@ def main(args=None):
 
     for cmd, f in commands.items():
         if f.__functype__ == 'method':
+            if ws is None:
+                continue
             cls_name = f.__wrapped__.__qualname__.split('.')[0]
             if main is None:
                 try:
@@ -101,7 +106,7 @@ def main(args=None):
             for k, v in f.__funcspec__.kw:
                 builder.add_opt(k, v)
 
-        if len(f.__funcspec__.pos) > 0 and f.__funcspec__.pos[0] == 'self':
+        if f.__functype__ == 'method':
             sub.set_defaults(func=_default_func(f, main))
         else:
             sub.set_defaults(func=_default_func(f, ws))

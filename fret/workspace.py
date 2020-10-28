@@ -1,5 +1,6 @@
 import copy
 import inspect as ins
+import json
 import logging
 import pathlib
 import pickle
@@ -225,21 +226,20 @@ class Workspace:
         return Run(self, tag, resume)
 
     def record(self, value, metrics, descending=None, **kwargs):
-        raise NotImplementedError
-        # is_des = descending is True or \
-        #     (descending is None and metrics.endswith('-'))
-        # metrics = metrics.rstrip('+-') + ('-' if is_des else '+')
+        is_des = descending is True or \
+            (descending is None and metrics.endswith('-'))
+        metrics = metrics.rstrip('+-') + ('-' if is_des else '+')
 
-        # data = {}
-        # for name, cfg in self.config_dict().items():
-        #     for k, v in cfg.items():
-        #         data[name + '.' + k] = v
+        data = {}
+        for name, cfg in self.config_dict().items():
+            for k, v in cfg.items():
+                data[name + '.' + k] = v
 
-        # data.update({'metrics': metrics, 'value': value})
-        # data.update(kwargs)
+        data.update({'metrics': metrics, 'value': value})
+        data.update(kwargs)
 
-        # with self.result(start_time + '.json-lines').open('a') as of:
-        #     print(json.dumps(data), file=of)
+        with self.result(self._rt.date_str + '.json-lines').open('a') as of:
+            print(json.dumps(data), file=of)
 
     def __str__(self):
         return str(self.path)
