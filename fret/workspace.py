@@ -24,6 +24,14 @@ class Runtime:
         return pickle.load(open(fn, 'rb'))
 
 
+_Runtime = Runtime
+
+
+def set_runtime_class(cls):
+    global _Runtime
+    _Runtime = cls
+
+
 class Workspace:
     """Workspace utilities. One can save/load configurations, build models
     with specific configuration, save snapshots, open results, etc., using
@@ -52,6 +60,8 @@ class Workspace:
 
         if config:
             self._modules.update(config)
+
+        self._rt = _Runtime()
 
     def config_dict(self):
         return {name: dict({'class': cls_name}, **cfg)
@@ -168,7 +178,7 @@ class Workspace:
             f = self.snapshot(obj.build_name + '.' + tag + '.pt')
         else:
             f = pathlib.Path(tag)
-        pickle.dump({'env': env, 'args': args, 'state': state}, f.open('wb'))
+        self._rt.save({'env': env, 'args': args, 'state': state}, str(f))
 
     def load(self, name='main', tag=None, path=None):
         """Load module from a snapshot.
@@ -181,7 +191,7 @@ class Workspace:
             f = pathlib.Path(path)
         else:
             f = self.snapshot(name + '.' + tag + '.pt')
-        state = pickle.load(f.open('rb'))
+        state = self._rt.load(str(f))
         last_ws = Workspace(self._path, config_dict=state['env'])
         obj = last_ws.build(name, **state['args'])
         obj.load_state_dict(state['state'])
@@ -256,7 +266,7 @@ class Run:
             if ids:
                 self._id = max(ids)  # most recent
         if self._id is None:
-            self._id = tag
+            self._id = tag + '-' + self._ws._rt.date_str
         if not resume:
             while ws.snapshot(self._id).exists():
                 self._id = self._id + '_'
@@ -265,7 +275,7 @@ class Run:
         # load state if possible
         state_file = self._ws.snapshot(self._id, '.states.pt')
         if state_file.exists():
-            self._states = pickle.load(state_file.open('rb'))
+            self._states = self._ws._rt.load(str(state_file))
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -273,7 +283,7 @@ class Run:
         for k in self._states:
             if hasattr(self._states[k], 'state_dict'):
                 self._states[k] = self._states[k].state_dict()
-        pickle.dump(self._states, state_file.open('wb'))
+        self._ws._rt.save(self._states, str(state_file))
 
     @property
     def id(self):

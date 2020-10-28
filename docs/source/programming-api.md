@@ -95,4 +95,5 @@ fret/
   util.py       # util types and functions
   workspace.py  # workspace related
   app.py        # app related
+  cli.py        # CLI related
 ```
