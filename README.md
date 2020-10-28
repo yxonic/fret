@@ -196,4 +196,5 @@ foo='bar'
 - [x] No confusing overloads. Be explicit.
 - [x] `cli` module specialized for command line use.
 - [x] CLI launch optimization.
+- [x] `@command` wrapper on configurable class methods.
 - [ ] Windows support.

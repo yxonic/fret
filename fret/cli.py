@@ -37,8 +37,21 @@ def main(args=None):
     main_parser.add_argument('-v', action='store_true', help='verbose')
     main_parser.add_argument('-w', '--workspace', help='workspace dir')
 
-    args, remaining = main_parser.parse_known_args() if args is None \
-        else main_parser.parse_known_args(args)
+    if args is None:
+        args = sys.argv[1:]
+
+    with_help = False
+    if '-h' in args:
+        args.remove('-h')
+        with_help = True
+    if '--help' in args:
+        args.remove('--help')
+        with_help = True
+
+    args, remaining = main_parser.parse_known_args(args)
+
+    if with_help:
+        remaining.append('-h')
 
     # configure logging level
     if args.q:
