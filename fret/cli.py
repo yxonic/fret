@@ -109,14 +109,14 @@ def main(args=None):
         if f.__functype__ == 'method':
             sub.set_defaults(func=_default_func(f, main))
         else:
-            sub.set_defaults(func=_default_func(f, ws))
+            sub.set_defaults(func=_default_func(f, Workspace(ws_path)))
 
     if app is not None:
         config_sub = subparsers.add_parser(
             'config', help='configure module for workspace',
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         _add_config_sub(config_sub, argument_style)
-        config_sub.set_defaults(func=_config_default_func(ws))
+        config_sub.set_defaults(func=_config_default_func)
     else:
         config_sub = None
 
@@ -256,15 +256,14 @@ def _add_config_sub(parser, argument_style):
         sub.set_defaults(func=save)
 
 
-def _config_default_func(ws):
-    def f(args):
-        cfg = ws.config_path
-        if cfg.exists():
-            cfg = cfg.open().read().strip()
-            return cfg
-        else:
-            raise NotConfiguredError('no configuration in this workspace')
-    return f
+def _config_default_func(args):
+    ws = Workspace(args.workspace)
+    cfg = ws.config_path
+    if cfg.exists():
+        cfg = cfg.open().read().strip()
+        return cfg
+    else:
+        raise NotConfiguredError('no configuration in this workspace')
 
 
 @command(help='fork workspace, possibly with modifications')
