@@ -114,7 +114,7 @@ def test_workspace(tmpdir: py.path.local):
     # persistency: ws.run context manager
     with ws.run('test-1') as run:
         rid = run.id
-        assert rid.startswith('test-1-')
+        assert rid.startswith('test-1')
         assert run.log().is_dir()
         assert run.result().is_dir()
         assert run.snapshot().is_dir()
@@ -123,8 +123,6 @@ def test_workspace(tmpdir: py.path.local):
         s = run.acc()
         s += 1
         assert s.sum() == 1
-
-        ws.record(3, 'm1')
 
         for i in fret.util.nonbreak(run.range(10)):
             if i == 5:

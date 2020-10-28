@@ -1,6 +1,5 @@
 import copy
 import inspect as ins
-import json
 import logging
 import pathlib
 import pickle
@@ -169,7 +168,7 @@ class Workspace:
             f = self.snapshot(obj.build_name + '.' + tag + '.pt')
         else:
             f = pathlib.Path(tag)
-        pickle.dump({'env': env, 'args': args, 'state': state}, str(f))
+        pickle.dump({'env': env, 'args': args, 'state': state}, f.open('wb'))
 
     def load(self, name='main', tag=None, path=None):
         """Load module from a snapshot.
@@ -182,7 +181,7 @@ class Workspace:
             f = pathlib.Path(path)
         else:
             f = self.snapshot(name + '.' + tag + '.pt')
-        state = pickle.load(str(f))
+        state = pickle.load(f.open('rb'))
         last_ws = Workspace(self._path, config_dict=state['env'])
         obj = last_ws.build(name, **state['args'])
         obj.load_state_dict(state['state'])
@@ -216,20 +215,21 @@ class Workspace:
         return Run(self, tag, resume)
 
     def record(self, value, metrics, descending=None, **kwargs):
-        is_des = descending is True or \
-            (descending is None and metrics.endswith('-'))
-        metrics = metrics.rstrip('+-') + ('-' if is_des else '+')
+        raise NotImplementedError
+        # is_des = descending is True or \
+        #     (descending is None and metrics.endswith('-'))
+        # metrics = metrics.rstrip('+-') + ('-' if is_des else '+')
 
-        data = {}
-        for name, cfg in self.config_dict().items():
-            for k, v in cfg.items():
-                data[name + '.' + k] = v
+        # data = {}
+        # for name, cfg in self.config_dict().items():
+        #     for k, v in cfg.items():
+        #         data[name + '.' + k] = v
 
-        data.update({'metrics': metrics, 'value': value})
-        data.update(kwargs)
+        # data.update({'metrics': metrics, 'value': value})
+        # data.update(kwargs)
 
-        with self.result(start_time + '.json-lines').open('a') as of:
-            print(json.dumps(data), file=of)
+        # with self.result(start_time + '.json-lines').open('a') as of:
+        #     print(json.dumps(data), file=of)
 
     def __str__(self):
         return str(self.path)
@@ -256,7 +256,7 @@ class Run:
             if ids:
                 self._id = max(ids)  # most recent
         if self._id is None:
-            self._id = tag + '-' + start_time
+            self._id = tag
         if not resume:
             while ws.snapshot(self._id).exists():
                 self._id = self._id + '_'
@@ -265,7 +265,7 @@ class Run:
         # load state if possible
         state_file = self._ws.snapshot(self._id, '.states.pt')
         if state_file.exists():
-            self._states = pickle.load(str(state_file))
+            self._states = pickle.load(state_file.open('rb'))
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -273,7 +273,7 @@ class Run:
         for k in self._states:
             if hasattr(self._states[k], 'state_dict'):
                 self._states[k] = self._states[k].state_dict()
-        pickle.dump(self._states, str(state_file))
+        pickle.dump(self._states, state_file.open('wb'))
 
     @property
     def id(self):

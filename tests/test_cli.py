@@ -125,7 +125,7 @@ def test_main(tmpdir: py.path.local, caplog):
 
     assert main(['config']) is not None
 
-    main(['clean', '-c'])
+    main(['clean', '-c', '-f'])
     with pytest.raises(SystemExit):
         main(['run'])
 

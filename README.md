@@ -192,7 +192,7 @@ foo='bar'
 ## fret 0.3
 - [ ] Stablize programming API (around workspace).
 - [ ] Workspace runtime.
-- [ ] Better result recording and querying using db.
+- [ ] Better result recording and querying using DB (MongoDB first).
 - [x] No confusing overloads. Be explicit.
 - [x] `cli` module specialized for command line use.
 - [x] CLI launch optimization.
