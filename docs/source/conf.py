@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.abspath('../..'))
 # -- Project information -----------------------------------------------------
 
 project = 'fret'
-copyright = '2019, yxonic'
+copyright = '2020, yxonic'
 author = 'yxonic'
 
 import fret
