@@ -1,4 +1,3 @@
-import functools
 import importlib
 import inspect
 import itertools
@@ -6,14 +5,12 @@ import json
 import logging
 import math
 import os
-import pickle as _pickle
 import queue
 import random
 import signal
 import sys
 import threading
 import glob as _glob
-from datetime import datetime
 from collections.abc import Iterable
 
 if sys.implementation.name == 'cpython':
@@ -25,30 +22,6 @@ if sys.version_info >= _LOWEST_VERSION:
 else:
     from collections import OrderedDict
     _dict = OrderedDict
-
-start_time = datetime.now().strftime("%Y%m%d%H%M%S")
-
-
-class pickle:
-    saver = _pickle.dump
-    loader = _pickle.load
-
-    @staticmethod
-    def load(f):
-        return pickle.loader(open(f, 'rb'))
-
-    @staticmethod
-    def dump(obj, f):
-        with open(f, 'wb') as of:
-            pickle.saver(obj, of)
-
-
-def set_saver(saver):
-    pickle.saver = saver
-
-
-def set_loader(loader):
-    pickle.loader = loader
 
 
 class Configuration:
@@ -194,49 +167,25 @@ def colored(fmt, fg=None, bg=None, style=None):
         return fmt
 
 
-def _pairwise(ls):
-    i = 0
-    while i < len(ls):
-        yield ls[i], ls[i + 1]
-        i += 2
+class ColoredFormatter(logging.Formatter):
+    """Formatter for colored log."""
+    _LOG_COLORS = {
+        'WARNING': 'y',
+        'INFO': 'g',
+        'DEBUG': 'b',
+        'CRITICAL': 'y',
+        'ERROR': 'r'
+    }
 
-
-def overload(*rules):
-    """Decorator for defining function overloads."""
-    if len(rules) % 2 != 0:
-        raise ValueError("every guard must have an action.")
-
-    def wrapper(f):
-        @functools.wraps(f)
-        def new_f(*args, **kwargs):
-            for guard, action in _pairwise(rules):
-                if match(args, guard):
-                    if action is ...:
-                        break
-                    args = action(*args)
-                    break
-            else:
-                raise ValueError('argument not match any overloads')
-            return f(*args, **kwargs)
-        return new_f
-    return wrapper
-
-
-def match(args, rule):
-    """Simple pattern matching."""
-    if rule is ...:
-        return True
-    if not isinstance(rule, tuple) and not isinstance(rule, list):
-        if isinstance(rule, type):
-            return all(isinstance(x, rule) for x in args)
-        else:
-            return all(x == rule for x in args)
-    if len(args) != len(rule):
-        return False
-    return all(r is ... or
-               (isinstance(r, type) and isinstance(x, r)) or
-               (not isinstance(r, type) and x == r)
-               for x, r in zip(args, rule))
+    def format(self, record):
+        levelname = record.levelname
+        if levelname in self._LOG_COLORS:
+            record.levelname = colored(
+                record.levelname[0],
+                self._LOG_COLORS[record.levelname],
+                style='b'
+            )
+        return logging.Formatter.format(self, record)
 
 
 def stateful(*states):

@@ -1,36 +1,10 @@
 import importlib
 import os
 import sys
-from contextlib import contextmanager
 
-from fret.app import App, get_app, set_global_app
 from fret.cli import main
 import py
 import pytest
-
-
-@contextmanager
-def chapp(appdir, imp=True):
-    _app = get_app()
-    _cwd = os.getcwd()
-    _path = sys.path.copy()
-    appdir = str(appdir)
-    os.chdir(appdir)
-    app = App()
-    set_global_app(app)
-    if imp:
-        imp = app.import_modules()
-        if imp:
-            try:
-                importlib.reload(imp)
-            except (ImportError, AttributeError):
-                pass
-    try:
-        yield app
-    finally:
-        set_global_app(_app)
-        os.chdir(_cwd)
-        sys.path = _path
 
 
 code0 = '''
@@ -64,7 +38,7 @@ def train(ws):
 
 @fret.command
 def test(ws):
-    model = ws.load('ws/best/snapshot/main.trained.pt')
+    model = ws.load(path='ws/best/snapshot/main.trained.pt')
     print(model.weight)
     return model
 
@@ -103,86 +77,101 @@ def test_main(tmpdir: py.path.local, caplog):
     with pytest.raises(SystemExit):
         main()
 
-    assert caplog.text.count('no app found') == 1
     caplog.clear()
 
     # error test
     appdir = tmpdir.join('appdir0')
     appdir.mkdir()
+    os.chdir(str(appdir))
 
-    with chapp(appdir, imp=False) as app:
-        with appdir.join('main.py').open('w') as f:
-            f.write(code0)
+    with appdir.join('main.py').open('w') as f:
+        f.write(code0)
 
-        with pytest.raises(ImportError):
-            app.main()
+    with pytest.raises(ImportError):
+        import fret.app
+        assert fret.app
 
-        with appdir.join('main.py').open('w') as f:
-            f.write(code3)
+    with appdir.join('main.py').open('w') as f:
+        f.write(code3)
 
-        with pytest.raises(TypeError):
-            app.main()
+    with pytest.raises(TypeError):
+        import fret.app
+        assert fret.app
 
-        with appdir.join('main.py').open('w') as f:
-            f.write(code4)
+    with appdir.join('main.py').open('w') as f:
+        f.write(code4)
 
-        with pytest.raises(TypeError):
-            app.main()
+    with pytest.raises(TypeError):
+        import fret.app
+        assert fret.app
 
     # simple app test
     appdir = tmpdir.join('appdir1')
     appdir.mkdir()
+    os.chdir(str(appdir))
 
     with appdir.join('main.py').open('w') as f:
         f.write(code1)
 
-    with chapp(appdir) as app:
-        app.main('config Model'.split())
-        model = app.main(['run'])
-        assert model.config.x == 3
+    import fret.app
+    main('config Model'.split())
+    model = main(['run'])
+    assert model.config.x == 3
 
-        app.main('config Model -x 5 -y 10'.split())
-        model = app.main(['run'])
-        assert model.config.x == 5
-        assert model.config.y == 10
+    main('config Model -x 5 -y 10'.split())
+    model = main(['run'])
+    assert model.config.x == 5
+    assert model.config.y == 10
 
-        assert app.main(['config']) is not None
+    assert main(['config']) is not None
 
-        app.main(['clean', '-c'])
-        with pytest.raises(SystemExit):
-            app.main(['run'])
+    main(['clean', '-c', '-f'])
+    with pytest.raises(SystemExit):
+        main(['run'])
 
-        with pytest.raises(SystemExit):
-            assert app.main(['config']) is None
+    with pytest.raises(SystemExit):
+        assert main(['config']) is None
 
-        app.main('-w ws/model1 config Model'.split())
-        app.main('-w ws/model2 config Model -x 5 -y 10'.split())
-        model = app.main('-w ws/model1 run'.split())
-        assert model.config.x == 3
-        model = app.main('-w ws/model2 run'.split())
-        assert model.config.x == 5
+    main('-w ws/model1 config Model'.split())
+    main('-w ws/model2 config Model -x 5 -y 10'.split())
+    model = main('-w ws/model1 run'.split())
+    assert model.config.x == 3
+    model = main('-w ws/model2 run'.split())
+    assert model.config.x == 5
 
     appdir.join('fret.toml').open('w').close()
-    with chapp(appdir.join('ws/model2')) as app:
-        model = app.main(['run'])
-        assert model.config.x == 5
+
+    os.chdir(str(appdir.join('ws/model2')))
+    importlib.reload(fret)
+    importlib.reload(fret.app)
+
+    model = main(['run'])
+    assert model.config.x == 5
 
     appdir = tmpdir.join('appdir2')
     appdir.mkdir()
-    appdir.join('main.py').open('w').close()
 
     with appdir.join('main.py').open('w') as f:
         f.write(code2)
     with appdir.join('app.py').open('w') as f:
         f.write(code1)
-    with chapp(appdir) as app:
-        app.main('-w ws/best config Model'.split())
-        app.main(' -w ws/best train'.split())
-        model = app.main(['test'])
-        assert model.weight == 23
 
-        os.environ['FRETAPP'] = 'app'
-        app.main('config Model'.split())
-        model = app.main('run'.split())
-        del os.environ['FRETAPP']
-        assert model.config.x == 3
+    os.chdir(str(appdir))
+    del sys.modules['main']
+    del fret.app._module
+    importlib.reload(fret)
+    importlib.reload(fret.app)
+
+    main('-w ws/best config Model'.split())
+    main('-w ws/best train'.split())
+    model = main(['test'])
+    assert model.weight == 23
+
+    os.environ['FRETAPP'] = 'app'
+    importlib.reload(fret)
+    importlib.reload(fret.app)
+
+    main('config Model'.split())
+    model = main('run'.split())
+    del os.environ['FRETAPP']
+    assert model.config.x == 3

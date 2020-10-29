@@ -10,6 +10,17 @@ from sklearn.metrics import precision_recall_fscore_support
 from tqdm import tqdm
 
 
+class PyTorchRuntime(fret.Runtime):
+    def save(self, obj, fn):
+        torch.save(obj, fn)
+
+    def load(self, fn):
+        return torch.load(fn)
+
+
+fret.set_runtime_class(PyTorchRuntime)
+
+
 @fret.configurable
 class CNN(nn.Module):
     def __init__(self, n_classes, feature_maps=[4, 8, 16, 32, 64]):
@@ -36,9 +47,8 @@ class CNN(nn.Module):
 
 @fret.command
 def check(ws):
-    model = ws.build()
+    model = ws.build(n_classes=5)
     print(model)
-    print(model.model)
 
 
 @fret.command
@@ -55,9 +65,11 @@ def train(ws, n_epochs=5, batch_size=64):
         run.register(model)
         run.register(optimizer)
         for i in run.brange(n_epochs):
-            total_loss = run.acc('total_loss')
-            train_iter = run.iter('train_iter', data.data, data.targets,
-                                  prefetch=True, batch_size=batch_size)
+            total_loss = run.acc(name='total_loss')
+            train_iter = run.iter(data.train_data,
+                                  data.train_labels,
+                                  prefetch=True, batch_size=batch_size,
+                                  name='train_iter')
             for batch in fret.nonbreak(tqdm(train_iter,
                                             initial=train_iter.pos)):
                 y_pred = model(batch[0])
@@ -73,7 +85,7 @@ def train(ws, n_epochs=5, batch_size=64):
 
 @fret.command
 def test(ws, epoch, batch_size=128):
-    model = ws.load(str(epoch))
+    model = ws.load(tag=str(epoch))
     model.eval()
 
     _, data = load_data(False)
@@ -81,7 +93,7 @@ def test(ws, epoch, batch_size=128):
     with torch.no_grad():
         preds = []
         trues = []
-        test_iter = fret.util.Iterator(data.data, data.targets,
+        test_iter = fret.util.Iterator(data.test_data, data.test_labels,
                                        prefetch=True, batch_size=batch_size)
         for batch in tqdm(test_iter):
             y_pred = model(batch[0])

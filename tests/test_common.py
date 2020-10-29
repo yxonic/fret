@@ -6,7 +6,6 @@ import pytest
 import fret
 import fret.common
 import fret.util
-import fret.exceptions
 
 
 # noinspection PyUnusedLocal
@@ -41,7 +40,7 @@ class D:
 def test_module():
     c = D(A())
     assert c.sub.config == {'a': 0}
-    with pytest.raises(fret.exceptions.NoWorkspaceError):
+    with pytest.raises(fret.common.NoWorkspaceError):
         _ = c.ws
 
 
@@ -74,15 +73,15 @@ def test_workspace(tmpdir: py.path.local):
                                 str(tmpdir.join('ws/snapshot/duck.pt')))
 
         # test module registering
-        ws.register(A(a=1))
+        ws.register('main', A(a=1))
 
         ws.register('sub', B, b=2)
 
-        ws.register(D)
+        ws.register('main', D)
         model = ws.build()
         assert model.sub.config.b == 2
 
-        ws.register(C)
+        ws.register('main', C)
 
         with pytest.raises(TypeError):
             ws.build()
@@ -94,9 +93,9 @@ def test_workspace(tmpdir: py.path.local):
         ws.register('sub', B, b=4)
         ws.save(main, str(tmpdir.join('tag2.pt')))
 
-        main_ = ws.load('tag1')
+        main_ = ws.load(tag='tag1')
         assert main_.sub.config == main.sub.config
-        main_ = ws.load(str(tmpdir.join('tag2.pt')))
+        main_ = ws.load(path=str(tmpdir.join('tag2.pt')))
         assert main_.sub.config.b == 4
 
         logger = ws.logger('foo')
@@ -115,7 +114,7 @@ def test_workspace(tmpdir: py.path.local):
     # persistency: ws.run context manager
     with ws.run('test-1') as run:
         rid = run.id
-        assert rid.startswith('test-1-')
+        assert rid.startswith('test-1')
         assert run.log().is_dir()
         assert run.result().is_dir()
         assert run.snapshot().is_dir()
@@ -124,8 +123,6 @@ def test_workspace(tmpdir: py.path.local):
         s = run.acc()
         s += 1
         assert s.sum() == 1
-
-        ws.record(3, 'm1')
 
         for i in fret.util.nonbreak(run.range(10)):
             if i == 5:

@@ -1,4 +1,4 @@
-from .cli import main  # pragma: no cover
+from .cli import main
 
 if __name__ == '__main__':
     main()
