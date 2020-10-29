@@ -55,8 +55,8 @@ class Workspace:
         if conf is not None:
             self._config_dict = copy.deepcopy(conf)
             for name, cfg in conf.items():
-                cls_name = cfg['class']
-                del cfg['class']
+                cls_name = cfg['__module']
+                del cfg['__module']
                 self._modules[name] = (cls_name, cfg)
 
         if config:
@@ -65,7 +65,7 @@ class Workspace:
         self._rt = _Runtime()
 
     def config_dict(self):
-        return {name: dict({'class': cls_name}, **cfg)
+        return {name: dict({'__module': cls_name}, **cfg)
                 for name, (cls_name, cfg) in self._modules.items()}
 
     @property
