@@ -7,4 +7,4 @@ __all__ = [
     'workspace', 'Runtime', 'set_runtime_class',
 ]
 
-__version__ = '0.3.0-alpha.2'
+__version__ = '0.3.0'

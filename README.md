@@ -1,7 +1,7 @@
 # fret
 
-[![Travis (.org)](https://img.shields.io/travis/yxonic/fret/v0.3)](https://travis-ci.org/github/yxonic/fret/branches)
-[![Codecov](https://img.shields.io/coveralls/github/yxonic/fret/v0.3)](https://codecov.io/gh/yxonic/fret/branch/v0.3)
+[![Travis (.org)](https://img.shields.io/travis/yxonic/fret/)](https://travis-ci.org/github/yxonic/fret/)
+[![Codecov](https://img.shields.io/coveralls/github/yxonic/fret/)](https://codecov.io/gh/yxonic/fret/)
 [![Documentation Status](https://readthedocs.org/projects/fret/badge/?version=latest)](https://fret.readthedocs.io/en/latest/?badge=latest)
 [![PyPI](https://img.shields.io/pypi/v/fret.svg)](https://pypi.python.org/pypi/fret)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/fret.svg)](https://pypi.python.org/pypi/fret)
@@ -134,6 +134,39 @@ W cancelled by user
 $ fret resumable
 current epoch: 3, sum: 6, cnt: 4
 current epoch: 4, sum: 10, cnt: 5
+```
+
+### Dynamic commands
+
+You can specify commands inside configurables, and run them depending on current workspace setup:
+
+```python
+import fret
+
+@fret.configurable
+class App1:
+    @fret.command
+    def check(self):
+        print('running check from App1')
+
+@fret.configurable
+class App2:
+    @fret.command
+    def check(self, msg):
+        print('running check from App2 with message: ' + msg)
+```
+
+Then run:
+
+```sh
+$ fret config App1
+[ws/_default] configured "main" as "App1"
+$ fret check
+running check from App1
+$ fret config App2
+[ws/_default] configured "main" as "App2"
+$ fret check -m hello
+running check from App2 with message: hello
 ```
 
 ### Submodule
