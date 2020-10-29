@@ -12,7 +12,6 @@ import sys
 import threading
 import glob as _glob
 from collections.abc import Iterable
-from datetime import datetime
 
 if sys.implementation.name == 'cpython':
     _LOWEST_VERSION = (3, 6)
