@@ -6,7 +6,7 @@
 ```toml
 # ws/test/config.toml
 [main]
-class = "Model"
+__module = "Model"
 param = 1
 ```
 
