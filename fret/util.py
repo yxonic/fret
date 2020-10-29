@@ -13,7 +13,6 @@ import threading
 import glob as _glob
 from collections.abc import Iterable
 from datetime import datetime
-import pickle as _pickle
 
 if sys.implementation.name == 'cpython':
     _LOWEST_VERSION = (3, 6)
@@ -24,23 +23,6 @@ if sys.version_info >= _LOWEST_VERSION:
 else:
     from collections import OrderedDict
     _dict = OrderedDict
-
-
-start_time = datetime.now().strftime("%Y%m%d%H%M%S")
-
-
-class pickle:
-    saver = _pickle.dump
-    loader = _pickle.load
-
-    @staticmethod
-    def load(f):
-        return pickle.loader(open(f, 'rb'))
-
-    @staticmethod
-    def dump(obj, f):
-        with open(f, 'wb') as of:
-            pickle.saver(obj, of)
 
 
 class Configuration:
