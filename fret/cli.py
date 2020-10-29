@@ -97,7 +97,9 @@ def main(args=None):
                 continue
 
         sub = subparsers.add_parser(
-            cmd, description=getattr(f, '__desc__', None),
+            cmd,
+            help=getattr(f, '__help__', 'command ' + cmd),
+            description=getattr(f, '__desc__', None),
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
         with ParserBuilder(sub, argument_style) as builder:
