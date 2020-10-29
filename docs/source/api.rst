@@ -14,11 +14,19 @@ Main Functionalities
 
 .. autoclass:: fret.argspec
 
+.. autofunction:: fret.nonbreak
+
+.. autofunction:: fret.stateful
+
 
 Common Components
 -----------------
 .. automodule:: fret.common
    :members:
+
+.. automodule:: fret.workspace
+   :members:
+
 
 Application Object and CLI
 --------------------------
