@@ -90,7 +90,7 @@ def main(args=None):
             if main is None:
                 try:
                     main = ws.build()
-                except NotConfiguredError:
+                except Exception:  # pylint: disable=broad-except
                     main = ''
             if cls_name != main.__class__.__name__:
                 # not applicable
