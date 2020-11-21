@@ -95,10 +95,11 @@ class argspec:
 class funcspec:
     """Utility to generate argument specification from function signature."""
 
-    __slots__ = ['pos', 'kw', 'kw_only']
+    __slots__ = ['pos', 'kw', 'kw_only', 'varkw']
 
     def __init__(self, f):
         spec = ins.getfullargspec(f)
+        self.varkw = spec.varkw
         if spec.defaults:
             self.kw_only = False
             n_config = len(spec.defaults)

@@ -234,9 +234,23 @@ def _add_config_sub(parser, argument_style):
         group = sub.add_argument_group('config')
 
         with ParserBuilder(group, argument_style) as builder:
-            for name, opt in module_cls.__funcspec__.kw:
-                builder.add_opt(name, opt)
-
+            mro = []
+            for base_cls in module_cls.__mro__:
+                mro.append(base_cls)
+                if (
+                    not hasattr(base_cls, '__funcspec__') or
+                    not base_cls.__funcspec__.varkw
+                ):
+                    break
+            for base_cls in reversed(mro):
+                if hasattr(base_cls, '__funcspec__'):
+                    for name, opt in base_cls.__funcspec__.kw:
+                        builder.add_opt(name, opt)
+            for submodule in module_cls.submodules:
+                builder.add_opt(submodule, argspec(
+                    default=submodule,
+                    help='submodule ' + submodule
+                ))
         for action in group._group_actions:
             group_options[module].add(action.dest)
 
