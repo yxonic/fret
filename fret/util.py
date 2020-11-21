@@ -1,17 +1,12 @@
-import importlib
 import inspect
 import itertools
-import json
 import logging
 import math
-import os
 import queue
 import random
 import signal
 import sys
 import threading
-import glob as _glob
-from collections.abc import Iterable
 
 if sys.implementation.name == 'cpython':
     _LOWEST_VERSION = (3, 6)
@@ -372,104 +367,3 @@ class Iterator:
                         return
                     else:
                         raise
-
-
-def collect(glob, last=False):
-    summarizer = Summarizer()
-
-    last_dirname = None
-    for file in sorted(_glob.glob(glob + '/*.json-lines', recursive=True),
-                       reverse=True):
-        if last_dirname != os.path.dirname(file):
-            last_dirname = os.path.dirname(file)
-        elif last:
-            continue
-        for line in open(file):
-            summarizer.add(**json.loads(line))
-
-    return summarizer
-
-
-class Summarizer:
-    def __init__(self, data=None):
-        self.data = data or []
-        self.is_des = _dict()
-
-    def __len__(self):
-        return len(self.data)
-
-    def add(self, value, metrics, **kwargs):
-        _metrics = metrics.rstrip('+-')
-        self.is_des[_metrics] = metrics.endswith('-')
-        data = _dict(metrics=_metrics, value=value)
-        data.update(kwargs)
-        self.data.append(data)
-
-    def df(self):
-        try:
-            pd = importlib.import_module('pandas')
-        except ImportError:
-            raise ImportError('pandas needed for result summarization')
-        return pd.DataFrame(self.data)
-
-    def summarize(self, rows=None, columns=None, row_order=None,
-                  column_order=None, scheme='best', topk=-1, filter=None):
-        df = self.df()
-        pd = importlib.import_module('pandas')
-        if filter is not None:
-            df = filter(df)
-        df = df.fillna('-')
-        if rows is None and columns is None:
-            columns = ['metrics']
-        if rows is None or columns is None:
-            current = set(rows or columns)
-            current.add('value')
-            groups = [c for c in df.columns if c not in current]
-            if rows is None:
-                rows = groups
-            else:
-                columns = groups
-        groups = rows + columns
-        df = df.groupby(groups)['value']
-        ind = groups.index('metrics')
-
-        if isinstance(scheme, str) or not isinstance(scheme, Iterable):
-            scheme = [scheme]
-
-        def f(x):
-            if topk > 0:
-                x = x.sort_values(
-                    ascending=self.is_des.get(x.name[ind])
-                )[:topk]
-            for s in scheme:
-                if s == 'best':
-                    x = x.min() if self.is_des.get(x.name[ind]) else x.max()
-                elif s == 'mean':
-                    x = x.mean()
-                elif callable(s):
-                    x = s(x)
-                else:
-                    raise ValueError('scheme not supported')
-            return x
-
-        df = df.apply(f)
-        df = df.unstack(columns)
-        if row_order is not None:
-            if isinstance(row_order[0], list):
-                df = df.reindex(
-                    pd.MultiIndex.from_product(row_order,
-                                               names=df.rows.names),
-                    axis=0
-                )
-            else:
-                df = df.reindex(row_order, axis=0)
-        if column_order is not None:
-            if isinstance(column_order[0], list):
-                df = df.reindex(
-                    pd.MultiIndex.from_product(column_order,
-                                               names=df.columns.names),
-                    axis=1
-                )
-            else:
-                df = df.reindex(column_order, axis=1)
-        return df
