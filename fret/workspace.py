@@ -4,33 +4,11 @@ import json
 import logging
 import pathlib
 import pickle
-from datetime import datetime
 
 import toml
 
-from .common import configurables, NotConfiguredError
-from .util import Configuration, stateful, Iterator
-
-
-class Runtime:
-    def __init__(self):
-        self.start_time = datetime.now()
-        self.date_str = self.start_time.strftime('%Y%m%d%H%M%S')
-
-    def save(self, obj, fn):
-        with open(fn, 'wb') as f:
-            pickle.dump(obj, f)
-
-    def load(self, fn):
-        return pickle.load(open(fn, 'rb'))
-
-
-_Runtime = Runtime
-
-
-def set_runtime_class(cls):
-    global _Runtime
-    _Runtime = cls
+from .common import configurables, plugins, NotConfiguredError
+from .util import Configuration, stateful, Iterator, date_str
 
 
 class Workspace:
@@ -62,7 +40,8 @@ class Workspace:
         if config:
             self._modules.update(config)
 
-        self._rt = _Runtime()
+        for plugin in plugins:
+            plugin.apply(self)
 
     def config_dict(self):
         return {name: dict({'__module': cls_name}, **cfg)
@@ -179,7 +158,7 @@ class Workspace:
             f = self.snapshot(obj.build_name + '.' + tag + '.pt')
         else:
             f = pathlib.Path(tag)
-        self._rt.save({'env': env, 'args': args, 'state': state}, str(f))
+        self.save_to_file({'env': env, 'args': args, 'state': state}, str(f))
 
     def load(self, name='main', tag=None, path=None):
         """Load module from a snapshot.
@@ -192,11 +171,18 @@ class Workspace:
             f = pathlib.Path(path)
         else:
             f = self.snapshot(name + '.' + tag + '.pt')
-        state = self._rt.load(str(f))
+        state = self.load_from_file(str(f))
         last_ws = Workspace(self._path, config_dict=state['env'])
         obj = last_ws.build(name, **state['args'])
         obj.load_state_dict(state['state'])
         return obj
+
+    def save_to_file(self, obj, fn):
+        with open(fn, 'wb') as f:
+            pickle.dump(obj, f)
+
+    def load_from_file(self, fn):
+        return pickle.load(open(fn, 'rb'))
 
     def logger(self, name: str):
         """Get a logger that logs to a file under workspace.
@@ -238,7 +224,7 @@ class Workspace:
         data.update({'metrics': metrics, 'value': value})
         data.update(kwargs)
 
-        with self.result(self._rt.date_str + '.json-lines').open('a') as of:
+        with self.result(date_str + '.json-lines').open('a') as of:
             print(json.dumps(data), file=of)
 
     def __str__(self):
@@ -266,7 +252,7 @@ class Run:
             if ids:
                 self._id = max(ids)  # most recent
         if self._id is None:
-            self._id = tag + '-' + self._ws._rt.date_str
+            self._id = tag + '-' + date_str
         if not resume:
             while ws.snapshot(self._id).exists():
                 self._id = self._id + '_'
@@ -275,7 +261,7 @@ class Run:
         # load state if possible
         state_file = self._ws.snapshot(self._id, '.states.pt')
         if state_file.exists():
-            self._states = self._ws._rt.load(str(state_file))
+            self._states = self._ws.load_from_file(str(state_file))
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -283,7 +269,7 @@ class Run:
         for k in self._states:
             if hasattr(self._states[k], 'state_dict'):
                 self._states[k] = self._states[k].state_dict()
-        self._ws._rt.save(self._states, str(state_file))
+        self._ws.save_to_file(self._states, str(state_file))
 
     @property
     def id(self):

@@ -8,7 +8,7 @@ import os
 from .common import command, argspec, commands, configurables, \
     NoAppError, NotConfiguredError
 from .workspace import Workspace
-from .util import collect, colored, ColoredFormatter, Configuration
+from .util import colored, ColoredFormatter, Configuration
 
 
 def main(args=None):
@@ -380,81 +380,3 @@ def clean(ws,
                 (ws.path / 'config.toml').unlink()
             except FileNotFoundError:
                 pass
-
-
-def _selection_to_order(selection):
-    order = []
-    lo = 0
-    while True:
-        # noinspection PyUnresolvedReferences
-        try:
-            hi = selection.index('_', lo)
-        except ValueError:
-            # no _ left
-            order.append(selection[lo:])
-            break
-        order.append(selection[lo:hi])
-        lo = hi + 1
-    if len(order) == 1:
-        order = order[0]
-    return order
-
-
-@command(help='collect results and summarize')
-def summarize(
-    rows=argspec(
-        help='row names',
-        nargs='+', default=None
-    ),
-    columns=argspec(
-        help='column names',
-        nargs='*', default=None
-    ),
-    row_selection=argspec(
-        help='selection of row headers, different headers separated '
-             'by _ (eg: -rs H1 H2 _ h1 h2)',
-        nargs='+', default=None
-    ),
-    column_selection=argspec(
-        help='selection of column headers, different headers '
-             'separated by _ (eg: -rs C1 C2 _ c1 c2)',
-        nargs='+', default=None
-    ),
-    scheme=('best', 'output scheme',
-            ['best', 'mean', 'mean_with_error']),
-    topk=(-1, 'if >0, best k results will be taken into account'),
-    format=(None, 'float point format spec (eg: .4f)'),
-    output=(None, 'output format', ['html', 'latex']),
-    glob=('ws/**', 'workspace pattern'),
-    last=(False, 'only retrieve last record in each result directory')
-):
-    """Command ``summarize``.
-
-    Summarize all results recorded by ``ws.record``.
-    """
-    summarizer = collect(glob, last)
-    if len(summarizer) == 0:
-        raise ValueError('no results found')
-
-    row_order = row_selection and _selection_to_order(row_selection)
-    column_order = column_selection and _selection_to_order(column_selection)
-
-    schemes = []
-    if scheme == 'mean_with_error':
-        schemes.append(lambda x: (x.mean(), x.std()))
-        spec = ':' + format if format else ''
-        fmt = r'{%s}$\pm${%s}' % (spec, spec) if output == 'latex' \
-            else '{%s}±{%s}' % (spec, spec)
-        schemes.append(lambda x: fmt.format(*x))
-    else:
-        schemes.append(scheme)
-        if format:
-            fmt = '{:%s}' % format
-            schemes.append(lambda x: fmt.format(x))
-    df = summarizer.summarize(rows, columns, row_order, column_order,
-                              scheme=schemes, topk=topk)
-    if output == 'latex':
-        return df.to_latex(escape=False)
-    if output == 'html':
-        return df.to_html(escape=False)
-    return df
