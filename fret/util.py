@@ -7,6 +7,8 @@ import random
 import signal
 import sys
 import threading
+from datetime import datetime
+
 
 if sys.implementation.name == 'cpython':
     _LOWEST_VERSION = (3, 6)
@@ -17,6 +19,9 @@ if sys.version_info >= _LOWEST_VERSION:
 else:
     from collections import OrderedDict
     _dict = OrderedDict
+
+
+date_str = datetime.now().strftime('%Y%m%d%H%M%S')
 
 
 class Configuration:

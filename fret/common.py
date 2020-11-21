@@ -5,6 +5,7 @@ from .util import _dict as dict, classproperty, Configuration
 
 configurables = dict()
 commands = dict()
+plugins = []
 
 
 class Module:
@@ -40,6 +41,18 @@ class Module:
 
     def __str__(self):
         return self.__class__.__name__ + '(' + str(self.config) + ')'
+
+
+class Plugin:
+    """Interface for external plugin
+
+    Pour new commands, or modify workspace object.
+    """
+
+    commands = []
+
+    def apply(self, ws):
+        pass
 
 
 class argspec:
@@ -240,6 +253,12 @@ def command(wraps=None, help=None, description=None):
         return wrapper
     else:
         return wrapper(wraps)
+
+
+def use(plugin):
+    plugins.append(plugin)
+    for cmd in plugin.commands:
+        command(cmd)
 
 
 class NotConfiguredError(Exception):
