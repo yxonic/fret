@@ -196,7 +196,7 @@ class ParserBuilder:
                 if short not in seen:
                     args.append('-' + short)
                     seen.add(short)
-            else:
+            elif args[0].startswith('-'):
                 kwargs['dest'] = name
             if 'help' not in kwargs:
                 kwargs['help'] = 'parameter ' + name
