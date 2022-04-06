@@ -86,15 +86,13 @@ def main(args=None):
         if f.__functype__ == 'method':
             if ws is None:
                 continue
-            cls_name = f.__wrapped__.__qualname__.split('.')[0]
+            cls_name, func_name = cmd.split('.')
             if main is None:
-                try:
-                    main = ws.build()
-                except Exception:  # pylint: disable=broad-except
-                    main = ''
+                main = ws.build()
             if cls_name != main.__class__.__name__:
                 # not applicable
                 continue
+            cmd = func_name
 
         sub = subparsers.add_parser(
             cmd,
