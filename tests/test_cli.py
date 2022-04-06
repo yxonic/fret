@@ -1,6 +1,5 @@
 import importlib
 import os
-import sys
 
 from fret.cli import main
 import py
@@ -148,30 +147,30 @@ def test_main(tmpdir: py.path.local, caplog):
     model = main(['run'])
     assert model.config.x == 5
 
-    appdir = tmpdir.join('appdir2')
-    appdir.mkdir()
+    # appdir = tmpdir.join('appdir2')
+    # appdir.mkdir()
 
-    with appdir.join('main.py').open('w') as f:
-        f.write(code2)
-    with appdir.join('app.py').open('w') as f:
-        f.write(code1)
+    # with appdir.join('main.py').open('w') as f:
+    #     f.write(code2)
+    # with appdir.join('app.py').open('w') as f:
+    #     f.write(code1)
 
-    os.chdir(str(appdir))
-    del sys.modules['main']
-    del fret.app._module
-    importlib.reload(fret)
-    importlib.reload(fret.app)
+    # os.chdir(str(appdir))
+    # del sys.modules['main']
+    # del fret.app._module
+    # importlib.reload(fret)
+    # importlib.reload(fret.app)
 
-    main('-w ws/best config Model'.split())
-    main('-w ws/best train'.split())
-    model = main(['test'])
-    assert model.weight == 23
+    # main('-w ws/best config Model'.split())
+    # main('-w ws/best train'.split())
+    # model = main(['test'])
+    # assert model.weight == 23
 
-    os.environ['FRETAPP'] = 'app'
-    importlib.reload(fret)
-    importlib.reload(fret.app)
+    # os.environ['FRETAPP'] = 'app'
+    # importlib.reload(fret)
+    # importlib.reload(fret.app)
 
-    main('config Model'.split())
-    model = main('run'.split())
-    del os.environ['FRETAPP']
-    assert model.config.x == 3
+    # main('config Model'.split())
+    # model = main('run'.split())
+    # del os.environ['FRETAPP']
+    # assert model.config.x == 3

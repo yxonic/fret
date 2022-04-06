@@ -156,6 +156,11 @@ def configurable(wraps=None, submodules=None, build_subs=True, states=None):
     def wrapper(cls):
         if not ins.isclass(cls):
             raise TypeError('only class can be configurable')
+        if cls.__name__ in configurables:
+            raise DuplicationError(
+                'configurable module %s already registered',
+                cls.__name__
+            )
         orig_init = cls.__init__
         spec = funcspec(orig_init)
 
@@ -230,6 +235,9 @@ def command(wraps=None, help=None, description=None):
             cls_name = f.__qualname__.split('.')[0]
             name = cls_name + '.' + name
 
+        if name in commands:
+            raise DuplicationError('command %s already registered', name)
+
         @functools.wraps(f)
         def new_f(*args, **kwargs):
             args, kwargs, cfg = spec.get_call_args(*args, **kwargs)
@@ -275,4 +283,8 @@ class NoWorkspaceError(Exception):
 
 
 class NoAppError(Exception):
+    pass
+
+
+class DuplicationError(Exception):
     pass
