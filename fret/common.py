@@ -216,6 +216,7 @@ def command(wraps=None, help=None, description=None):
         if not ins.isfunction(f):
             raise TypeError('only function can form command')
         name = f.__name__
+
         spec = funcspec(f)
         ftype = 'function'
         if spec.pos and (spec.pos[0] == 'ws' or spec.pos[0] == 'self'):
@@ -224,6 +225,10 @@ def command(wraps=None, help=None, description=None):
                 ftype = 'method'
         else:
             static = True
+
+        if ftype == 'method':
+            cls_name = f.__qualname__.split('.')[0]
+            name = cls_name + '.' + name
 
         @functools.wraps(f)
         def new_f(*args, **kwargs):
